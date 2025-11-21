@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		1FA106F72ED0CDF900C1F6AD /* DSWaveformImage in Frameworks */ = {isa = PBXBuildFile; productRef = 1FA106F62ED0CDF900C1F6AD /* DSWaveformImage */; };
+		1FA106F92ED0CDF900C1F6AD /* DSWaveformImageViews in Frameworks */ = {isa = PBXBuildFile; productRef = 1FA106F82ED0CDF900C1F6AD /* DSWaveformImageViews */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		25AF4C792EBA115D00B4F8F7 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -33,7 +38,8 @@
 		25AF4C8A2EBA115D00B4F8F7 /* Exceptions for "Memora" folder in "Memora" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				App/Info.plist,
+				DSWaveformImage,
+				Info.plist,
 			);
 			target = 25AF4C612EBA115B00B4F8F7 /* Memora */;
 		};
@@ -55,6 +61,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1FA106F72ED0CDF900C1F6AD /* DSWaveformImage in Frameworks */,
+				1FA106F92ED0CDF900C1F6AD /* DSWaveformImageViews in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -113,6 +121,8 @@
 			);
 			name = Memora;
 			packageProductDependencies = (
+				1FA106F62ED0CDF900C1F6AD /* DSWaveformImage */,
+				1FA106F82ED0CDF900C1F6AD /* DSWaveformImageViews */,
 			);
 			productName = Memora;
 			productReference = 25AF4C622EBA115B00B4F8F7 /* Memora.app */;
@@ -190,6 +200,9 @@
 			);
 			mainGroup = 25AF4C592EBA115B00B4F8F7;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				1FA106F52ED0CDE300C1F6AD /* XCRemoteSwiftPackageReference "DSWaveformImage" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 25AF4C632EBA115B00B4F8F7 /* Products */;
 			projectDirPath = "";
@@ -553,6 +566,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		1FA106F52ED0CDE300C1F6AD /* XCRemoteSwiftPackageReference "DSWaveformImage" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/dmrschmidt/DSWaveformImage";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 14.2.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		1FA106F62ED0CDF900C1F6AD /* DSWaveformImage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1FA106F52ED0CDE300C1F6AD /* XCRemoteSwiftPackageReference "DSWaveformImage" */;
+			productName = DSWaveformImage;
+		};
+		1FA106F82ED0CDF900C1F6AD /* DSWaveformImageViews */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 1FA106F52ED0CDE300C1F6AD /* XCRemoteSwiftPackageReference "DSWaveformImage" */;
+			productName = DSWaveformImageViews;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 25AF4C5A2EBA115B00B4F8F7 /* Project object */;
 }

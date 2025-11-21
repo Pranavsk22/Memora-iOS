@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="System colors in document resources" minToolsVersion="11.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner"/>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <collectionViewCell opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center" reuseIdentifier="RecentCell" id="gTV-IL-0wX" customClass="RecentCollectionViewCell" customModule="Home" customModuleProvider="target">
+            <rect key="frame" x="0.0" y="0.0" width="299" height="166"/>
+            <autoresizingMask key="autoresizingMask"/>
+            <view key="contentView" opaque="NO" clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="center">
+                <rect key="frame" x="0.0" y="0.0" width="299" height="166"/>
+                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                <subviews>
+                    <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="gCz-P1-BMp">
+                        <rect key="frame" x="0.0" y="0.0" width="299" height="166"/>
+                        <subviews>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" translatesAutoresizingMaskIntoConstraints="NO" id="BB5-u2-1s3">
+                                <rect key="frame" x="0.0" y="0.0" width="299" height="166"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="299" id="VMk-D1-yqB"/>
+                                    <constraint firstAttribute="height" constant="166" id="iut-Dx-Pqy"/>
+                                </constraints>
+                            </imageView>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Label" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="utw-O4-v4p">
+                                <rect key="frame" x="8" y="126" width="42" height="21"/>
+                                <fontDescription key="fontDescription" type="system" pointSize="17"/>
+                                <nil key="textColor"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                        </subviews>
+                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                        <constraints>
+                            <constraint firstAttribute="bottom" secondItem="BB5-u2-1s3" secondAttribute="bottom" id="37b-BW-04r"/>
+                            <constraint firstAttribute="height" constant="166" id="9a2-k6-gty"/>
+                            <constraint firstItem="BB5-u2-1s3" firstAttribute="top" secondItem="gCz-P1-BMp" secondAttribute="top" id="DIX-tJ-f9a"/>
+                            <constraint firstItem="BB5-u2-1s3" firstAttribute="leading" secondItem="gCz-P1-BMp" secondAttribute="leading" id="JbM-j7-Giq"/>
+                            <constraint firstItem="utw-O4-v4p" firstAttribute="leading" secondItem="gCz-P1-BMp" secondAttribute="leading" constant="8" id="Ol9-I3-VJ6"/>
+                            <constraint firstAttribute="bottom" secondItem="utw-O4-v4p" secondAttribute="bottom" constant="19" id="f6Z-eG-Btu"/>
+                            <constraint firstAttribute="trailing" secondItem="BB5-u2-1s3" secondAttribute="trailing" id="tC4-kj-W7E"/>
+                            <constraint firstAttribute="width" constant="299" id="xHF-kv-lZx"/>
+                        </constraints>
+                        <userDefinedRuntimeAttributes>
+                            <userDefinedRuntimeAttribute type="number" keyPath="layer.cornerRadius">
+                                <integer key="value" value="30"/>
+                            </userDefinedRuntimeAttribute>
+                        </userDefinedRuntimeAttributes>
+                    </view>
+                </subviews>
+            </view>
+            <viewLayoutGuide key="safeArea" id="ZTg-uK-7eu"/>
+            <constraints>
+                <constraint firstAttribute="trailing" secondItem="gCz-P1-BMp" secondAttribute="trailing" id="494-ZQ-xDA"/>
+                <constraint firstItem="gCz-P1-BMp" firstAttribute="top" secondItem="gTV-IL-0wX" secondAttribute="top" id="Xdh-Jk-Im6"/>
+                <constraint firstItem="gCz-P1-BMp" firstAttribute="leading" secondItem="gTV-IL-0wX" secondAttribute="leading" id="cSw-7r-l8a"/>
+                <constraint firstAttribute="bottom" secondItem="gCz-P1-BMp" secondAttribute="bottom" id="cZ9-Fh-J0S"/>
+            </constraints>
+            <size key="customSize" width="156" height="50"/>
+            <connections>
+                <outlet property="imageView" destination="BB5-u2-1s3" id="4jJ-sb-9Na"/>
+                <outlet property="overlayView" destination="gCz-P1-BMp" id="Ygw-R4-ato"/>
+                <outlet property="titleLabel" destination="utw-O4-v4p" id="kMT-tN-A66"/>
+            </connections>
+            <point key="canvasLocation" x="-57.251908396946561" y="100.70422535211269"/>
+        </collectionViewCell>
+    </objects>
+    <resources>
+        <systemColor name="systemBackgroundColor">
+            <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+        </systemColor>
+    </resources>
+</document>
