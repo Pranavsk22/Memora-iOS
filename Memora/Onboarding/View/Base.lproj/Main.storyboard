@@ -11,7 +11,7 @@
         <!--Home-->
         <scene sceneID="NqS-Hj-zYj">
             <objects>
-                <viewController storyboardIdentifier="HomeContainerViewController" id="dV9-69-ZYq" customClass="HomeContainerViewController" customModule="Home" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController storyboardIdentifier="HomeContainerViewController" id="dV9-69-ZYq" customClass="HomeContainerViewController" customModule="Memora" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="u5a-ei-Ygo" customClass="HomeContainerViewController">
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -43,7 +43,7 @@
         <!--Memories-->
         <scene sceneID="jol-Tw-Hmo">
             <objects>
-                <viewController storyboardIdentifier="MemoryContainerViewController" id="b4D-Bu-1Ye" customClass="MemoryContainerViewController" customModule="Home" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController storyboardIdentifier="MemoryContainerViewController" id="b4D-Bu-1Ye" customClass="MemoryContainerViewController" customModule="Memora" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="M2T-t8-mBQ">
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
@@ -176,11 +176,10 @@
                     </view>
                     <navigationItem key="navigationItem" id="hbZ-SA-IBr">
                         <barButtonItem key="rightBarButtonItem" style="plain" id="Zvx-G1-xyR">
-                            <button key="customView" opaque="NO" contentMode="scaleToFill" ambiguous="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" id="Im2-y7-7rt">
+                            <button key="customView" opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" id="Im2-y7-7rt">
                                 <rect key="frame" x="316" y="4.6666666666666687" width="57" height="34.666666666666664"/>
                                 <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                                 <constraints>
-                                    <constraint firstAttribute="height" constant="34" id="TX5-AE-HUB"/>
                                     <constraint firstAttribute="width" constant="57" id="swO-Ia-4Ht"/>
                                 </constraints>
                                 <state key="normal" title="Button"/>

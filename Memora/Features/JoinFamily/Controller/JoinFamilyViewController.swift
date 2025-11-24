@@ -89,7 +89,7 @@ class JoinFamilyViewController: UIViewController {
             showAlert("Enter 4-digit code")
             return
         }
-        let vc = FamilyMemberViewController(nibName: "FamilyMemberViewController", bundle: nil)
+        let vc = HomeViewController(nibName: "HomeViewController", bundle: nil)
         navigationController?.pushViewController(vc, animated: true)
         print("Joining family with code: \(code)")
         // handle success — move to next screen

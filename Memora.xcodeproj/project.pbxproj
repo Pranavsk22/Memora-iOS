@@ -35,7 +35,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		25AF4C8A2EBA115D00B4F8F7 /* Exceptions for "Memora" folder in "Memora" target */ = {
+		1FC49DD52ED4ABED005D98B6 /* Exceptions for "Memora" folder in "Memora" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -48,7 +48,7 @@
 		25AF4C642EBA115B00B4F8F7 /* Memora */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				25AF4C8A2EBA115D00B4F8F7 /* Exceptions for "Memora" folder in "Memora" target */,
+				1FC49DD52ED4ABED005D98B6 /* Exceptions for "Memora" folder in "Memora" target */,
 			);
 			path = Memora;
 			sourceTree = "<group>";

@@ -82,7 +82,11 @@ class FamilyMemberViewController: UIViewController {
         let FamilyList = FamilyMemberListViewController(nibName: "FamilyMemberListViewController", bundle: nil)
         navigationController?.pushViewController(FamilyList, animated: true)
     }
-
+    @IBAction func FamilyMemberChevronPressed(_ sender: UIButton) {
+        let FamilyList = FamilyMemberListViewController(nibName: "FamilyMemberListViewController", bundle: nil)
+        navigationController?.pushViewController(FamilyList, animated: true)
+    }
+    
     @IBAction func profileButtonPressed(_ sender: UIButton) {
         let vc = AccountModalViewController()
         let nav = UINavigationController(rootViewController: vc)

@@ -17,9 +17,16 @@ class CreateFamilyViewController: UIViewController {
         super.viewDidLoad()
 
         // Do any additional setup after loading the view.
+        
+        
+        
     }
 
-
+    @IBAction func createFamilyButtonTapped(_ sender: UIButton) {
+        let vc = HomeViewController(nibName: "HomeViewController", bundle: nil)
+        navigationController?.pushViewController(vc, animated: true)
+    }
+    
     /*
     // MARK: - Navigation
 
