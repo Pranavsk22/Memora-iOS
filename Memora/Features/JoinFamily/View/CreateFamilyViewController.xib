@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24128" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+    <device id="retina6_9" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24063"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <objects>
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner" customClass="CreateFamilyViewController" customModule="Memora" customModuleProvider="target">
+            <connections>
+                <outlet property="createFamilyButton" destination="N1V-YW-zkV" id="HmC-Ob-siJ"/>
+                <outlet property="familyName" destination="qVu-uK-Bk8" id="slc-5x-iWP"/>
+                <outlet property="view" destination="i5M-Pr-FkT" id="sfx-zR-JGt"/>
+            </connections>
+        </placeholder>
+        <placeholder placeholderIdentifier="IBFirstResponder" id="-2" customClass="UIResponder"/>
+        <view clearsContextBeforeDrawing="NO" contentMode="scaleToFill" id="i5M-Pr-FkT">
+            <rect key="frame" x="0.0" y="0.0" width="440" height="956"/>
+            <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+            <subviews>
+                <textField opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="248" contentHorizontalAlignment="left" contentVerticalAlignment="center" borderStyle="roundedRect" placeholder="Family Name" textAlignment="natural" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="qVu-uK-Bk8">
+                    <rect key="frame" x="30" y="374" width="380" height="45"/>
+                    <constraints>
+                        <constraint firstAttribute="height" constant="45" id="eTc-Hb-HDf"/>
+                    </constraints>
+                    <fontDescription key="fontDescription" type="system" pointSize="14"/>
+                    <textInputTraits key="textInputTraits"/>
+                </textField>
+                <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="N1V-YW-zkV">
+                    <rect key="frame" x="30" y="459" width="380" height="40"/>
+                    <constraints>
+                        <constraint firstAttribute="height" constant="40" id="pL2-a3-jvs"/>
+                    </constraints>
+                    <state key="normal" title="Button"/>
+                    <buttonConfiguration key="configuration" style="filled" title="Create Family">
+                        <fontDescription key="titleFontDescription" type="boldSystem" pointSize="18"/>
+                        <color key="baseBackgroundColor" white="0.0" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                    </buttonConfiguration>
+                </button>
+            </subviews>
+            <viewLayoutGuide key="safeArea" id="fnl-2z-Ty3"/>
+            <color key="backgroundColor" red="0.94901960784313721" green="0.94901960784313721" blue="0.96862745098039216" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+            <constraints>
+                <constraint firstItem="qVu-uK-Bk8" firstAttribute="leading" secondItem="fnl-2z-Ty3" secondAttribute="leading" constant="30" id="7PN-lt-aSV"/>
+                <constraint firstItem="fnl-2z-Ty3" firstAttribute="trailing" secondItem="N1V-YW-zkV" secondAttribute="trailing" constant="30" id="8gF-ik-fuW"/>
+                <constraint firstItem="N1V-YW-zkV" firstAttribute="leading" secondItem="fnl-2z-Ty3" secondAttribute="leading" constant="30" id="9Xs-9a-c3U"/>
+                <constraint firstItem="fnl-2z-Ty3" firstAttribute="trailing" secondItem="qVu-uK-Bk8" secondAttribute="trailing" constant="30" id="MLt-ga-0NK"/>
+                <constraint firstItem="N1V-YW-zkV" firstAttribute="top" secondItem="qVu-uK-Bk8" secondAttribute="bottom" constant="40" id="QdC-8k-Q5W"/>
+                <constraint firstItem="qVu-uK-Bk8" firstAttribute="top" secondItem="fnl-2z-Ty3" secondAttribute="top" constant="250" id="oJW-gI-Fo9"/>
+            </constraints>
+            <point key="canvasLocation" x="139" y="154"/>
+        </view>
+    </objects>
+</document>
