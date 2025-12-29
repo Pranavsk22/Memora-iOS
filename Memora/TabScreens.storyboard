@@ -24,17 +24,17 @@
             </objects>
             <point key="canvasLocation" x="116.79389312977099" y="953.52112676056345"/>
         </scene>
-        <!--Family-->
+        <!--Groups-->
         <scene sceneID="R6z-T5-o7T">
             <objects>
-                <viewController id="dDA-b3-Jum" customClass="FamilyContainerViewController" customModule="Memora" customModuleProvider="target" sceneMemberID="viewController">
+                <viewController id="dDA-b3-Jum" customClass="GroupsContainerViewController" customModule="Memora" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="Ybn-DK-j9o">
                         <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <viewLayoutGuide key="safeArea" id="4LU-P5-Yfv"/>
                         <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                     </view>
-                    <navigationItem key="navigationItem" title="Family" id="lRk-Su-82S"/>
+                    <navigationItem key="navigationItem" title="Groups" id="lRk-Su-82S"/>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="rmV-cA-XY1" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
@@ -114,11 +114,11 @@
             </objects>
             <point key="canvasLocation" x="3216.030534351145" y="945.77464788732402"/>
         </scene>
-        <!--Family-->
+        <!--Groups-->
         <scene sceneID="7Er-05-bok">
             <objects>
                 <navigationController automaticallyAdjustsScrollViewInsets="NO" id="3Oy-da-7ic" sceneMemberID="viewController">
-                    <tabBarItem key="tabBarItem" title="Family" image="person.2.fill" catalog="system" id="FfG-sZ-59u"/>
+                    <tabBarItem key="tabBarItem" title="Groups" image="person.2.fill" catalog="system" id="FfG-sZ-59u"/>
                     <toolbarItems/>
                     <navigationBar key="navigationBar" contentMode="scaleToFill" id="igD-X4-p1S">
                         <rect key="frame" x="0.0" y="118" width="393" height="54"/>
