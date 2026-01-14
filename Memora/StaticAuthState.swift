@@ -1,3 +1,11 @@
+//
+//  AuthState.swift
+//  Memora
+//
+//  Created by user@3 on 14/01/26.
+//
+
+
 import Foundation
 import Combine
 
@@ -15,7 +23,7 @@ class AuthState: ObservableObject {
     }
     
     func checkAuthStatus() {
-        isAuthenticated = SupabaseManager.shared.isUserLoggedIn()
+        isAuthenticated = StaticDataManager.shared.isUserLoggedIn()
         
         if isAuthenticated {
             Task {
@@ -26,7 +34,7 @@ class AuthState: ObservableObject {
     
     func loadUserProfile() async {
         do {
-            userProfile = try await SupabaseManager.shared.getUserProfile()
+            userProfile = try await StaticDataManager.shared.getUserProfile()
         } catch {
             print("Failed to load user profile: \(error)")
         }
@@ -39,19 +47,9 @@ class AuthState: ObservableObject {
         defer { isLoading = false }
         
         do {
-            // 1. Create auth account
-            try await SupabaseManager.shared.signUp(name: name, email: email, password: password)
-            
-            // 2. Sign in to get session
-            try await SupabaseManager.shared.signIn(email: email, password: password)
-            
-            // 3. Create profile
-            try await SupabaseManager.shared.createUserProfile(name: name, email: email)
-            
-            // 4. Update state
+            try await StaticDataManager.shared.signUp(name: name, email: email, password: password)
             isAuthenticated = true
             await loadUserProfile()
-            
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -67,7 +65,7 @@ class AuthState: ObservableObject {
         defer { isLoading = false }
         
         do {
-            try await SupabaseManager.shared.signIn(email: email, password: password)
+            try await StaticDataManager.shared.signIn(email: email, password: password)
             isAuthenticated = true
             await loadUserProfile()
             return true
@@ -80,7 +78,7 @@ class AuthState: ObservableObject {
     
     func signOut() async {
         do {
-            try await SupabaseManager.shared.signOut()
+            try await StaticDataManager.shared.signOut()
             isAuthenticated = false
             userProfile = nil
             errorMessage = nil
@@ -88,5 +86,10 @@ class AuthState: ObservableObject {
             errorMessage = error.localizedDescription
             print("Sign out error: \(error)")
         }
+    }
+    
+    // Helper function for quick demo login
+    func demoLogin() async -> Bool {
+        return await signIn(email: "john@example.com", password: "password123")
     }
 }
