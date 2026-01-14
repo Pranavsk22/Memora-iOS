@@ -74,7 +74,18 @@ struct UserGroup: Codable, Identifiable {
         case adminId = "admin_id"  // ADD THIS
         case createdAt = "created_at"
     }
+    
+    init(id: String, name: String, code: String, createdBy: String, adminId: String, createdAt: Date) {
+            self.id = id
+            self.name = name
+            self.code = code
+            self.createdBy = createdBy
+            self.adminId = adminId
+            self.createdAt = createdAt
+    }
 }
+
+
 
 struct GroupMember: Codable, Identifiable {
     let id: String
@@ -112,4 +123,40 @@ struct GroupMemory: Codable, Identifiable {
         case createdAt = "created_at"
         case userName = "user_name"
     }
+}
+
+// MARK: - Static Demo Models
+
+// For static authentication
+struct DemoUser: Codable, Identifiable {
+    let id: String
+    let name: String
+    let email: String
+    let password: String
+    let createdAt: Date
+    
+    init(id: String, name: String, email: String, password: String = "password123") {
+        self.id = id
+        self.name = name
+        self.email = email
+        self.password = password
+        self.createdAt = Date()
+    }
+}
+
+// For memory storage
+struct DemoMemory: Codable, Identifiable {
+    let id: String
+    let title: String
+    let content: String?
+    let category: String
+    let createdAt: Date
+}
+
+// For static group members
+struct DemoGroupMembership {
+    let groupId: String
+    let userId: String
+    let isAdmin: Bool
+    let joinedAt: Date
 }

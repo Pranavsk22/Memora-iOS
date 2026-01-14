@@ -19,18 +19,244 @@ class GroupsListViewController: UIViewController {
         setupFloatingButton()
         setupEmptyState()
         
-        // Debug: Add test action
-        addGroupButton.addTarget(self, action: #selector(debugButtonPress), for: .touchUpInside)
+        // Add long press gesture for delete/leave
+        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress))
+        tableView.addGestureRecognizer(longPressGesture)
         
-        // Listen for refresh notifications
+        print("\n🚀=== APP STARTED ===🚀")
+        print("👤 User ID: \(StaticDataManager.shared.getCurrentUserId() ?? "None")")
+        
+        // Test connection
+        Task {
+            let connected = await StaticDataManager.shared.testConnection()
+            print("🌐 Supabase connection: \(connected ? "✅ Connected" : "❌ Failed")")
+            
+            // Load groups
+            loadGroups()
+        }
+        
         NotificationCenter.default.addObserver(self,
                                              selector: #selector(refreshGroups),
                                              name: NSNotification.Name("GroupsListShouldRefresh"),
                                              object: nil)
     }
+
+    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        
+        let touchPoint = gesture.location(in: tableView)
+        if let indexPath = tableView.indexPathForRow(at: touchPoint) {
+            let group = groups[indexPath.row]
+            showGroupActions(for: group, at: indexPath)
+        }
+    }
+
+    private func showGroupActions(for group: UserGroup, at indexPath: IndexPath) {
+        guard let currentUserId = StaticDataManager.shared.getCurrentUserId() else { return }
+        
+        let isAdmin = group.adminId == currentUserId
+        
+        let alert = UIAlertController(
+            title: group.name,
+            message: "Group Code: \(group.code)",
+            preferredStyle: .actionSheet
+        )
+        
+        if isAdmin {
+            // Admin options
+            alert.addAction(UIAlertAction(title: "Delete Group", style: .destructive) { [weak self] _ in
+                self?.confirmDeleteGroup(group: group, at: indexPath)
+            })
+            
+            alert.addAction(UIAlertAction(title: "View Members", style: .default) { [weak self] _ in
+                self?.viewGroupMembers(group: group)
+            })
+            
+            alert.addAction(UIAlertAction(title: "Share Group Code", style: .default) { [weak self] _ in
+                self?.shareGroupCode(group: group)
+            })
+        } else {
+            // Member options
+            alert.addAction(UIAlertAction(title: "Leave Group", style: .destructive) { [weak self] _ in
+                self?.confirmLeaveGroup(group: group, at: indexPath)
+            })
+            
+            alert.addAction(UIAlertAction(title: "View Members", style: .default) { [weak self] _ in
+                self?.viewGroupMembers(group: group)
+            })
+            
+            alert.addAction(UIAlertAction(title: "Share Group Code", style: .default) { [weak self] _ in
+                self?.shareGroupCode(group: group)
+            })
+        }
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        // For iPad
+        if let popoverController = alert.popoverPresentationController {
+            popoverController.sourceView = tableView.cellForRow(at: indexPath)
+            popoverController.sourceRect = tableView.cellForRow(at: indexPath)?.bounds ?? CGRect.zero
+        }
+        
+        present(alert, animated: true)
+    }
+
+    private func shareGroupCode(group: UserGroup) {
+        let shareText = "Join my group '\(group.name)' on Memora! Group Code: \(group.code)"
+        let activityVC = UIActivityViewController(activityItems: [shareText], applicationActivities: nil)
+        
+        // For iPad
+        if let popoverController = activityVC.popoverPresentationController {
+            popoverController.sourceView = self.view
+            popoverController.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
+        }
+        
+        present(activityVC, animated: true)
+    }
+
+    private func viewGroupMembers(group: UserGroup) {
+        let loadingAlert = UIAlertController(title: nil, message: "Loading members...", preferredStyle: .alert)
+        let loadingIndicator = UIActivityIndicatorView(frame: CGRect(x: 10, y: 5, width: 50, height: 50))
+        loadingIndicator.hidesWhenStopped = true
+        loadingIndicator.style = .medium
+        loadingIndicator.startAnimating()
+        loadingAlert.view.addSubview(loadingIndicator)
+        present(loadingAlert, animated: true)
+        
+        Task {
+            do {
+                let members = try await StaticDataManager.shared.getGroupMembers(groupId: group.id)
+                
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        self.showMembersList(group: group, members: members)
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        self.showAlert(title: "Error", message: "Could not load members: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+    }
+
+    private func showMembersList(group: UserGroup, members: [GroupMember]) {
+        let message = members.map { member in
+            "• \(member.name) \(member.isAdmin ? "👑 (Admin)" : "")"
+        }.joined(separator: "\n")
+        
+        let alert = UIAlertController(
+            title: "\(group.name) Members",
+            message: message.isEmpty ? "No members found" : message,
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Close", style: .default))
+        
+        present(alert, animated: true)
+    }
+
+    // Update the existing confirmDeleteGroup and confirmLeaveGroup to show loading indicators
+    private func confirmDeleteGroup(group: UserGroup, at indexPath: IndexPath) {
+        let alert = UIAlertController(
+            title: "Delete Group",
+            message: "Are you sure you want to delete '\(group.name)'? This action cannot be undone.",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
+            self?.deleteGroup(group: group, at: indexPath)
+        })
+        
+        present(alert, animated: true)
+    }
+
+    private func deleteGroup(group: UserGroup, at indexPath: IndexPath) {
+        let loadingAlert = UIAlertController(title: nil, message: "Deleting group...", preferredStyle: .alert)
+        let loadingIndicator = UIActivityIndicatorView(frame: CGRect(x: 10, y: 5, width: 50, height: 50))
+        loadingIndicator.hidesWhenStopped = true
+        loadingIndicator.style = .medium
+        loadingIndicator.startAnimating()
+        loadingAlert.view.addSubview(loadingIndicator)
+        present(loadingAlert, animated: true)
+        
+        Task {
+            do {
+                try await StaticDataManager.shared.deleteGroup(groupId: group.id)
+                
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        self.groups.remove(at: indexPath.row)
+                        self.tableView.deleteRows(at: [indexPath], with: .automatic)
+                        self.emptyStateView.isHidden = !self.groups.isEmpty
+                        self.showAlert(title: "Success", message: "Group deleted successfully")
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        self.showAlert(title: "Error", message: error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
+
+    private func confirmLeaveGroup(group: UserGroup, at indexPath: IndexPath) {
+        let alert = UIAlertController(
+            title: "Leave Group",
+            message: "Are you sure you want to leave '\(group.name)'?",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Leave", style: .destructive) { [weak self] _ in
+            self?.leaveGroup(group: group, at: indexPath)
+        })
+        
+        present(alert, animated: true)
+    }
+
+    private func leaveGroup(group: UserGroup, at indexPath: IndexPath) {
+        guard let userId = StaticDataManager.shared.getCurrentUserId() else { return }
+        
+        let loadingAlert = UIAlertController(title: nil, message: "Leaving group...", preferredStyle: .alert)
+        let loadingIndicator = UIActivityIndicatorView(frame: CGRect(x: 10, y: 5, width: 50, height: 50))
+        loadingIndicator.hidesWhenStopped = true
+        loadingIndicator.style = .medium
+        loadingIndicator.startAnimating()
+        loadingAlert.view.addSubview(loadingIndicator)
+        present(loadingAlert, animated: true)
+        
+        Task {
+            do {
+                try await StaticDataManager.shared.removeGroupMember(groupId: group.id, userId: userId)
+                
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        self.groups.remove(at: indexPath.row)
+                        self.tableView.deleteRows(at: [indexPath], with: .automatic)
+                        self.emptyStateView.isHidden = !self.groups.isEmpty
+                        self.showAlert(title: "Success", message: "Left group successfully")
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        self.showAlert(title: "Error", message: error.localizedDescription)
+                    }
+                }
+            }
+        }
+    }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        
+        // load groups normally
         loadGroups()
     }
     
@@ -97,12 +323,12 @@ class GroupsListViewController: UIViewController {
     }
     
     private func loadGroups() {
-        print("Loading groups...")
+        print("📱 Loading groups...")
         
         Task {
             do {
-                let fetchedGroups = try await SupabaseManager.shared.getMyGroups()
-                print("Successfully fetched \(fetchedGroups.count) groups")
+                let fetchedGroups = try await StaticDataManager.shared.getMyGroups()
+                print("📱 Successfully loaded \(fetchedGroups.count) groups")
                 
                 DispatchQueue.main.async {
                     self.groups = fetchedGroups
@@ -110,16 +336,29 @@ class GroupsListViewController: UIViewController {
                     self.refreshControl.endRefreshing()
                     self.emptyStateView.isHidden = !self.groups.isEmpty
                     
-                    // Debug: Print groups
-                    for group in self.groups {
-                        print("Group: \(group.name), Code: \(group.code), Admin: \(group.adminId)")
+                    // Print all groups
+                    for (index, group) in self.groups.enumerated() {
+                        print("📱 Group \(index + 1): \(group.name) (\(group.code))")
+                    }
+                    
+                    // Show success message if we have groups
+                    if !self.groups.isEmpty {
+                        let groupNames = self.groups.map { $0.name }.joined(separator: ", ")
+                        print("📱 Showing groups: \(groupNames)")
                     }
                 }
             } catch {
-                print("Error fetching groups: \(error)")
+                print("❌ Error in loadGroups: \(error)")
                 DispatchQueue.main.async {
                     self.refreshControl.endRefreshing()
-                    self.showAlert(title: "Error", message: error.localizedDescription)
+                    
+                    // Even on error, show demo groups
+                    let demoGroups = StaticDataManager.shared.getDemoGroups()
+                    self.groups = demoGroups
+                    self.tableView.reloadData()
+                    self.emptyStateView.isHidden = true
+                    
+                    print("📱 Showing demo groups due to error")
                 }
             }
         }
@@ -180,7 +419,7 @@ extension GroupsListViewController: UITableViewDataSource, UITableViewDelegate {
         let group = groups[indexPath.row]
         
         // Check if current user is admin
-        let isAdmin = group.adminId == SupabaseManager.shared.getCurrentUserId()
+        let isAdmin = group.adminId == StaticDataManager.shared.getCurrentUserId()
         
         // Configure cell with admin badge if user is admin
         cell.configure(
@@ -197,15 +436,22 @@ extension GroupsListViewController: UITableViewDataSource, UITableViewDelegate {
         tableView.deselectRow(at: indexPath, animated: true)
         
         let group = groups[indexPath.row]
-        let vc = GroupDetailViewController(group: group)
-        navigationController?.pushViewController(vc, animated: true)
+        print("Selected group: \(group.name), ID: \(group.id)")
+        
+        // Navigate to FamilyMemberViewController
+        let familyVC = FamilyMemberViewController(nibName: "FamilyMemberViewController", bundle: nil)
+        
+        // You might want to pass the group data
+        // familyVC.group = group
+        
+        navigationController?.pushViewController(familyVC, animated: true)
     }
     
     func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
         let group = groups[indexPath.row]
         
         // Only allow admin to delete group
-        if group.adminId == SupabaseManager.shared.getCurrentUserId() {
+        if group.adminId == StaticDataManager.shared.getCurrentUserId() {
             let deleteAction = UIContextualAction(style: .destructive, title: "Delete") { [weak self] _, _, completion in
                 self?.confirmDeleteGroup(group: group, at: indexPath)
                 completion(true)
@@ -224,73 +470,73 @@ extension GroupsListViewController: UITableViewDataSource, UITableViewDelegate {
         return UISwipeActionsConfiguration(actions: [leaveAction])
     }
     
-    private func confirmDeleteGroup(group: UserGroup, at indexPath: IndexPath) {
-        let alert = UIAlertController(
-            title: "Delete Group",
-            message: "Are you sure you want to delete '\(group.name)'? This action cannot be undone.",
-            preferredStyle: .alert
-        )
-        
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
-            self?.deleteGroup(group: group, at: indexPath)
-        })
-        
-        present(alert, animated: true)
-    }
+//    private func confirmDeleteGroup(group: UserGroup, at indexPath: IndexPath) {
+//        let alert = UIAlertController(
+//            title: "Delete Group",
+//            message: "Are you sure you want to delete '\(group.name)'? This action cannot be undone.",
+//            preferredStyle: .alert
+//        )
+//        
+//        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+//        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
+//            self?.deleteGroup(group: group, at: indexPath)
+//        })
+//        
+//        present(alert, animated: true)
+//    }
     
-    private func confirmLeaveGroup(group: UserGroup, at indexPath: IndexPath) {
-        let alert = UIAlertController(
-            title: "Leave Group",
-            message: "Are you sure you want to leave '\(group.name)'?",
-            preferredStyle: .alert
-        )
-        
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        alert.addAction(UIAlertAction(title: "Leave", style: .destructive) { [weak self] _ in
-            self?.leaveGroup(group: group, at: indexPath)
-        })
-        
-        present(alert, animated: true)
-    }
+//    private func confirmLeaveGroup(group: UserGroup, at indexPath: IndexPath) {
+//        let alert = UIAlertController(
+//            title: "Leave Group",
+//            message: "Are you sure you want to leave '\(group.name)'?",
+//            preferredStyle: .alert
+//        )
+//        
+//        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+//        alert.addAction(UIAlertAction(title: "Leave", style: .destructive) { [weak self] _ in
+//            self?.leaveGroup(group: group, at: indexPath)
+//        })
+//        
+//        present(alert, animated: true)
+//    }
     
-    private func deleteGroup(group: UserGroup, at indexPath: IndexPath) {
-        Task {
-            do {
-                try await SupabaseManager.shared.deleteGroup(groupId: group.id)
-                
-                DispatchQueue.main.async {
-                    self.groups.remove(at: indexPath.row)
-                    self.tableView.deleteRows(at: [indexPath], with: .automatic)
-                    self.emptyStateView.isHidden = !self.groups.isEmpty
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self.showAlert(title: "Error", message: error.localizedDescription)
-                }
-            }
-        }
-    }
-    
-    private func leaveGroup(group: UserGroup, at indexPath: IndexPath) {
-        guard let userId = SupabaseManager.shared.getCurrentUserId() else { return }
-        
-        Task {
-            do {
-                try await SupabaseManager.shared.removeGroupMember(groupId: group.id, userId: userId)
-                
-                DispatchQueue.main.async {
-                    self.groups.remove(at: indexPath.row)
-                    self.tableView.deleteRows(at: [indexPath], with: .automatic)
-                    self.emptyStateView.isHidden = !self.groups.isEmpty
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    self.showAlert(title: "Error", message: error.localizedDescription)
-                }
-            }
-        }
-    }
+//    private func deleteGroup(group: UserGroup, at indexPath: IndexPath) {
+//        Task {
+//            do {
+//                try await SupabaseManager.shared.deleteGroup(groupId: group.id)
+//                
+//                DispatchQueue.main.async {
+//                    self.groups.remove(at: indexPath.row)
+//                    self.tableView.deleteRows(at: [indexPath], with: .automatic)
+//                    self.emptyStateView.isHidden = !self.groups.isEmpty
+//                }
+//            } catch {
+//                DispatchQueue.main.async {
+//                    self.showAlert(title: "Error", message: error.localizedDescription)
+//                }
+//            }
+//        }
+//    }
+//    
+//    private func leaveGroup(group: UserGroup, at indexPath: IndexPath) {
+//        guard let userId = SupabaseManager.shared.getCurrentUserId() else { return }
+//        
+//        Task {
+//            do {
+//                try await SupabaseManager.shared.removeGroupMember(groupId: group.id, userId: userId)
+//                
+//                DispatchQueue.main.async {
+//                    self.groups.remove(at: indexPath.row)
+//                    self.tableView.deleteRows(at: [indexPath], with: .automatic)
+//                    self.emptyStateView.isHidden = !self.groups.isEmpty
+//                }
+//            } catch {
+//                DispatchQueue.main.async {
+//                    self.showAlert(title: "Error", message: error.localizedDescription)
+//                }
+//            }
+//        }
+//    }
 }
 
 // MARK: - GroupActionSheetDelegate
@@ -298,6 +544,7 @@ extension GroupsListViewController: GroupActionSheetDelegate {
     func didSelectCreateGroup() {
         print("Create group selected")
         let createVC = CreateGroupViewController(nibName: "CreateGroupViewController", bundle: nil)
+        createVC.delegate = self  // Add this line
         let nav = UINavigationController(rootViewController: createVC)
         nav.modalPresentationStyle = .pageSheet
         
@@ -309,10 +556,12 @@ extension GroupsListViewController: GroupActionSheetDelegate {
         
         present(nav, animated: true)
     }
+
     
     func didSelectJoinGroup() {
         print("Join group selected")
         let joinVC = JoinGroupModalViewController(nibName: "JoinGroupModalViewController", bundle: nil)
+        joinVC.delegate = self  // Add this line
         let nav = UINavigationController(rootViewController: joinVC)
         nav.modalPresentationStyle = .pageSheet
         
@@ -325,3 +574,30 @@ extension GroupsListViewController: GroupActionSheetDelegate {
         present(nav, animated: true)
     }
 }
+
+
+
+// MARK: - CreateGroupDelegate
+extension GroupsListViewController: CreateGroupDelegate {
+    func didCreateGroupSuccessfully() {
+        print("Group created successfully, refreshing list...")
+        // Refresh after a short delay to ensure data is saved
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.loadGroups()
+        }
+    }
+}
+
+// MARK: - JoinGroupDelegate
+extension GroupsListViewController: JoinGroupDelegate {
+    func didJoinGroupSuccessfully() {
+        print("Group joined successfully, refreshing list...")
+        // Refresh after a short delay to ensure data is saved
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.loadGroups()
+        }
+    }
+}
+
+
+// In CreateGroupViewController, call delegate when group is created

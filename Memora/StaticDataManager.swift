@@ -1,3 +1,11 @@
+//
+//  StaticDataManager.swift
+//  Memora
+//
+//  Created by user@3 on 14/01/26.
+//
+
+
 import Foundation
 
 class StaticDataManager {
@@ -389,4 +397,33 @@ class StaticDataManager {
     func getCurrentUser() -> DemoUser? {
         return currentUser
     }
+    
+    
+    // MARK: - Groups (Add this method)
+
+    func updateGroupAdmin(groupId: String, userId: String, isAdmin: Bool) async throws {
+        await simulateDelay(seconds: 0.3)
+        
+        // Find the membership
+        if let index = demoGroupMemberships.firstIndex(where: {
+            $0.groupId == groupId && $0.userId == userId
+        }) {
+            // Update the membership
+            let oldMembership = demoGroupMemberships[index]
+            let updatedMembership = DemoGroupMembership(
+                groupId: groupId,
+                userId: userId,
+                isAdmin: isAdmin,
+                joinedAt: oldMembership.joinedAt
+            )
+            demoGroupMemberships[index] = updatedMembership
+            
+            print("✅ Static: Updated admin status for user \(userId) in group \(groupId): \(isAdmin)")
+        } else {
+            throw NSError(domain: "Groups", code: 404, userInfo: [
+                NSLocalizedDescriptionKey: "Member not found in group"
+            ])
+        }
+    }
 }
+

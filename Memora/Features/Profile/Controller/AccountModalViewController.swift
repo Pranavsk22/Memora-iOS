@@ -88,7 +88,7 @@ class AccountModalViewController: UIViewController {
     private func updateUserInfo() {
         Task {
             do {
-                userProfile = try await SupabaseManager.shared.getUserProfile()
+                userProfile = try await StaticDataManager.shared.getUserProfile()
                 DispatchQueue.main.async {
                     self.userNameLabel?.text = self.userProfile?.name ?? "User"
                 }
@@ -140,7 +140,7 @@ class AccountModalViewController: UIViewController {
         
         Task {
             do {
-                try await SupabaseManager.shared.signOut()
+                try await StaticDataManager.shared.signOut()
                 
                 DispatchQueue.main.async {
                     self.hideLoadingIndicator()

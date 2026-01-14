@@ -45,7 +45,7 @@ class GroupDetailViewController: UIViewController {
                                          action: #selector(shareGroupTapped))
         
         // Add settings button for admin
-        if group.adminId == SupabaseManager.shared.getCurrentUserId() {
+        if group.adminId == StaticDataManager.shared.getCurrentUserId() {
             let settingsButton = UIBarButtonItem(image: UIImage(systemName: "gearshape"),
                                                 style: .plain,
                                                 target: self,
@@ -82,7 +82,7 @@ class GroupDetailViewController: UIViewController {
     private func loadData() {
         Task {
             do {
-                async let membersTask = SupabaseManager.shared.getGroupMembers(groupId: group.id)
+                async let membersTask = StaticDataManager.shared.getGroupMembers(groupId: group.id)
                 // async let memoriesTask = SupabaseManager.shared.getGroupMemories(groupId: group.id)
                 
                 let fetchedMembers = try await membersTask
@@ -180,7 +180,7 @@ class GroupDetailViewController: UIViewController {
     private func deleteGroup() {
         Task {
             do {
-                try await SupabaseManager.shared.deleteGroup(groupId: group.id)
+                try await StaticDataManager.shared.deleteGroup(groupId: group.id)
                 
                 DispatchQueue.main.async {
                     // Go back to groups list

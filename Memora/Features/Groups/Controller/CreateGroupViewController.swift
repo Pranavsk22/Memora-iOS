@@ -1,10 +1,18 @@
 import UIKit
 
+// Add this protocol at the top of the file
+protocol CreateGroupDelegate: AnyObject {
+    func didCreateGroupSuccessfully()
+}
+
 class CreateGroupViewController: UIViewController {
     
     @IBOutlet weak var groupNameTextField: UITextField!
     @IBOutlet weak var createButton: UIButton!
     @IBOutlet weak var cardView: UIView!
+    
+    // Add delegate property
+    weak var delegate: CreateGroupDelegate?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -69,21 +77,30 @@ class CreateGroupViewController: UIViewController {
             return
         }
         
+        print("🔍 CreateGroupVC: Starting group creation: \(groupName)")
+        
         // Disable button and show loading
         createButton.isEnabled = false
         createButton.setTitle("Creating...", for: .normal)
         
         Task {
             do {
-                let group = try await SupabaseManager.shared.createGroup(name: groupName)
+                print("🔍 CreateGroupVC: Calling SupabaseManager.createGroup...")
+                let group = try await StaticDataManager.shared.createGroup(name: groupName)
                 
                 DispatchQueue.main.async {
+                    print("✅ CreateGroupVC: Group created successfully: \(group.name)")
                     self.createButton.isEnabled = true
                     self.createButton.setTitle("Create Group", for: .normal)
+                    
+                    // Notify delegate
+                    self.delegate?.didCreateGroupSuccessfully()
+                    
                     self.showSuccessAlert(group: group)
                 }
             } catch {
                 DispatchQueue.main.async {
+                    print("❌ CreateGroupVC: Error: \(error.localizedDescription)")
                     self.createButton.isEnabled = true
                     self.createButton.setTitle("Create Group", for: .normal)
                     self.showAlert(title: "Error", message: error.localizedDescription)
@@ -101,7 +118,7 @@ class CreateGroupViewController: UIViewController {
         
         alert.addAction(UIAlertAction(title: "Copy Code", style: .default) { _ in
             UIPasteboard.general.string = group.code
-            self.dismissAndRefresh()
+            self.dismissViewController()
         })
         
         alert.addAction(UIAlertAction(title: "Share Code", style: .default) { _ in
@@ -109,7 +126,7 @@ class CreateGroupViewController: UIViewController {
         })
         
         alert.addAction(UIAlertAction(title: "Done", style: .cancel) { _ in
-            self.dismissAndRefresh()
+            self.dismissViewController()
         })
         
         present(alert, animated: true)
@@ -121,9 +138,9 @@ class CreateGroupViewController: UIViewController {
         present(activityVC, animated: true)
     }
     
-    private func dismissAndRefresh() {
-        // Notify groups list to refresh
-        NotificationCenter.default.post(name: NSNotification.Name("GroupsListShouldRefresh"), object: nil)
+    private func dismissViewController() {
+        // Check if we should notify delegate (already notified in createGroup)
+        // The delegate might want to refresh immediately
         
         if let navigationController = navigationController {
             navigationController.popViewController(animated: true)
@@ -133,7 +150,15 @@ class CreateGroupViewController: UIViewController {
     }
     
     @objc private func closeTapped() {
-        dismissAndRefresh()
+        if let navigationController = navigationController {
+            if navigationController.viewControllers.first == self {
+                navigationController.dismiss(animated: true)
+            } else {
+                navigationController.popViewController(animated: true)
+            }
+        } else {
+            dismiss(animated: true)
+        }
     }
     
     private func showAlert(title: String, message: String) {
@@ -142,4 +167,3 @@ class CreateGroupViewController: UIViewController {
         present(alert, animated: true)
     }
 }
-

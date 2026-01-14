@@ -1,17 +1,18 @@
-//
-//  JoinGroupModalViewController.swift
-//  Memora
-//
-//  Created by user@3 on 28/12/25.
-//
-
 import UIKit
+
+// Add this protocol at the top
+protocol JoinGroupDelegate: AnyObject {
+    func didJoinGroupSuccessfully()
+}
 
 class JoinGroupModalViewController: UIViewController {
     
     @IBOutlet weak var codeTextField: UITextField!
     @IBOutlet weak var joinButton: UIButton!
     @IBOutlet weak var cardView: UIView!
+    
+    // Add delegate property
+    weak var delegate: JoinGroupDelegate?
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -76,10 +77,12 @@ class JoinGroupModalViewController: UIViewController {
         
         Task {
             do {
-                let group = try await SupabaseManager.shared.joinGroup(code: code)
+                let group = try await StaticDataManager.shared.joinGroup(code: code)
                 
                 DispatchQueue.main.async {
                     loadingAlert.dismiss(animated: true) {
+                        // Notify delegate
+                        self.delegate?.didJoinGroupSuccessfully()
                         self.showSuccessAlert(group: group)
                     }
                 }
@@ -101,14 +104,14 @@ class JoinGroupModalViewController: UIViewController {
         )
         
         alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
-            self.dismissAndRefresh()
+            self.dismissViewController()
         })
         
         present(alert, animated: true)
     }
     
-    private func dismissAndRefresh() {
-        NotificationCenter.default.post(name: NSNotification.Name("GroupsListShouldRefresh"), object: nil)
+    private func dismissViewController() {
+        // Delegate already notified, just dismiss
         dismiss(animated: true)
     }
     

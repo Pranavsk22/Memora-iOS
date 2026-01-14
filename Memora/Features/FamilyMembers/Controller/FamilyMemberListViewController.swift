@@ -9,7 +9,6 @@ import UIKit
 
 class FamilyMemberListViewController: UIViewController {
 
-    
     let lightGrey = UIColor(red: 242/255, green: 242/255, blue: 247/255, alpha: 1)
     
     @IBOutlet weak var tableView: UITableView!
@@ -28,14 +27,10 @@ class FamilyMemberListViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        
-
         navigationItem.title = "Family Members"
-        navigationItem.rightBarButtonItem = UIBarButtonItem(
-            barButtonSystemItem: .add,
-            target: self,
-            action: #selector(addMemberTapped)
-        )
+        
+        // NO ADD BUTTON - Remove navigation bar button
+        navigationItem.rightBarButtonItem = nil
         
         // Register Member Cell (XIB)
         let memberNib = UINib(nibName: "FamilyMemberListTableViewCell", bundle: nil)
@@ -53,26 +48,6 @@ class FamilyMemberListViewController: UIViewController {
         tableView.backgroundColor = lightGrey
         view.backgroundColor = lightGrey
     }
-    
-    //add member button
-    @objc func addMemberTapped() {
-        let modalVC = AddFamilyMemberModalViewController(
-            nibName: "AddFamilyMemberModalViewController",
-            bundle: nil
-        )
-        
-        // iOS Bottom Sheet
-        modalVC.modalPresentationStyle = .pageSheet
-        
-        if let sheet = modalVC.sheetPresentationController {
-            sheet.detents = [.large()]        // or .medium(), or custom height
-            sheet.prefersGrabberVisible = true
-            sheet.preferredCornerRadius = 20
-        }
-        
-        present(modalVC, animated: true)
-    }
-
 }
 
 extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDelegate {
@@ -104,7 +79,6 @@ extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDele
             cell.backgroundColor = lightGrey
             cell.contentView.backgroundColor = lightGrey
 
-            
             return cell
         }
         
@@ -112,7 +86,6 @@ extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDele
             withIdentifier: "FamilyMemberListCell",
             for: indexPath
         ) as! FamilyMemberListTableViewCell
-        
         
         cell.backgroundColor = lightGrey
         cell.contentView.backgroundColor = lightGrey
@@ -124,7 +97,7 @@ extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDele
         return cell
     }
     
-    // ✅ ADD SPACING BETWEEN SECTIONS
+    // ADD SPACING BETWEEN SECTIONS
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
         return section == 1 ? 32 : 0.001
     }
@@ -135,7 +108,6 @@ extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDele
         let headerView = UIView()
         headerView.backgroundColor = lightGrey
 
-
         let titleLabel = UILabel()
         titleLabel.text = "Family Members"
         titleLabel.font = UIFont.preferredFont(forTextStyle: .footnote).bold()
@@ -144,7 +116,6 @@ extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDele
 
         headerView.addSubview(titleLabel)
 
-        // Constrain label with left/right insets to align with cell content (72 leading to match separator inset)
         NSLayoutConstraint.activate([
             titleLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor, constant: 16),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: headerView.trailingAnchor, constant: -16),
@@ -155,6 +126,8 @@ extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDele
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        
         if indexPath.section == 0 {
             print("Tapped Join Requests")
             let familyRequest = FamilyRequestsViewController(nibName: "FamilyRequestsViewController", bundle: nil)
