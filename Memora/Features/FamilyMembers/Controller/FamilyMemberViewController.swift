@@ -1,3 +1,4 @@
+
 //
 //  FamilyMemberViewController.swift
 //  Memora
@@ -8,6 +9,8 @@
 import UIKit
 
 class FamilyMemberViewController: UIViewController {
+    
+    var group: UserGroup?
 
     // MARK: - IBOutlets
     @IBOutlet weak var membersCollectionView: UICollectionView!
@@ -27,29 +30,19 @@ class FamilyMemberViewController: UIViewController {
         ("Graduation Day", "Peter", "Window")
     ]
     
+    // MARK: - Layout
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
 
-        // Ensure autolayout has laid out subviews
-        view.layoutIfNeeded()
-
-        // Defensive: make sure outlet exists
-        guard profileButton.bounds.width > 0 && profileButton.bounds.height > 0 else {
-            return
-        }
-
-        // Make it perfectly circular (handles non-square buttons too)
+        // Profile button circular styling
         let radius = min(profileButton.bounds.width, profileButton.bounds.height) / 2
         profileButton.layer.cornerRadius = radius
-        profileButton.layer.masksToBounds = true            // clip subviews (image) to rounded shape
-        profileButton.clipsToBounds = true                  // same as above for UIKit
+        profileButton.clipsToBounds = true
 
-        // Optional: make image fill the circle nicely
         profileButton.imageView?.contentMode = .scaleAspectFill
         profileButton.contentHorizontalAlignment = .fill
         profileButton.contentVerticalAlignment = .fill
 
-        // Optional: visual tweaks
         profileButton.layer.borderWidth = 1
         profileButton.layer.borderColor = UIColor.black.withAlphaComponent(0.12).cgColor
     }
@@ -58,47 +51,73 @@ class FamilyMemberViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        // Background FIX
-     
-        view.backgroundColor = UIColor(red: 242/255, green: 242/255, blue: 247/255, alpha: 1)
+        // Background (unchanged color scheme)
+        view.backgroundColor = UIColor(
+            red: 242/255,
+            green: 242/255,
+            blue: 247/255,
+            alpha: 1
+        )
 
         setupMembersCollection()
         setupPostsCollection()
     }
   
-   
     // MARK: - Members Collection Setup
     private func setupMembersCollection() {
-        let nib = UINib(nibName: "FamilyMemberCollectionViewCell", bundle: nil)
-        membersCollectionView.register(nib, forCellWithReuseIdentifier: "FamilyMemberCell")
+        let nib = UINib(
+            nibName: "FamilyMemberCollectionViewCell",
+            bundle: nil
+        )
+        membersCollectionView.register(
+            nib,
+            forCellWithReuseIdentifier: "FamilyMemberCell"
+        )
 
         membersCollectionView.delegate = self
         membersCollectionView.dataSource = self
-
-        membersCollectionView.backgroundColor = .clear  // FIX WHITE BACKGROUND
+        membersCollectionView.backgroundColor = .clear
 
         if let layout = membersCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
             layout.scrollDirection = .horizontal
-            layout.minimumLineSpacing = 12
-            layout.itemSize = CGSize(width: 140, height: 190)
-            layout.sectionInset = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
+
+            // 🔧 CHANGED: Better spacing for rounded cards
+            layout.itemSize = CGSize(width: 150, height: 190)
+            layout.minimumLineSpacing = 16
+            layout.sectionInset = UIEdgeInsets(
+                top: 0,
+                left: 16,
+                bottom: 0,
+                right: 16
+            )
         }
     }
 
-    // MARK: - Posts Collection Setup (Home-style Explore More)
+    // MARK: - Posts Collection Setup
     private func setupPostsCollection() {
-        let nib = UINib(nibName: "FamilyMemoriesCollectionViewCell", bundle: nil)
-        postsCollectionView.register(nib, forCellWithReuseIdentifier: "FamilyMemoriesCell")
+        let nib = UINib(
+            nibName: "FamilyMemoriesCollectionViewCell",
+            bundle: nil
+        )
+        postsCollectionView.register(
+            nib,
+            forCellWithReuseIdentifier: "FamilyMemoriesCell"
+        )
 
         postsCollectionView.delegate = self
         postsCollectionView.dataSource = self
-        postsCollectionView.backgroundColor = .clear  // FIX WHITE BACKGROUND
+        postsCollectionView.backgroundColor = .clear
         postsCollectionView.showsVerticalScrollIndicator = false
 
         if let layout = postsCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
             layout.scrollDirection = .vertical
             layout.minimumLineSpacing = 35
-            layout.sectionInset = UIEdgeInsets(top: 0, left: 16, bottom: 16, right: 16)
+            layout.sectionInset = UIEdgeInsets(
+                top: 0,
+                left: 16,
+                bottom: 16,
+                right: 16
+            )
             layout.itemSize = CGSize(
                 width: view.bounds.width - 32,
                 height: 394
@@ -108,12 +127,19 @@ class FamilyMemberViewController: UIViewController {
 
     // MARK: - Navigation actions
     @IBAction func FamilyMemberPressed(_ sender: UIButton) {
-        let FamilyList = FamilyMemberListViewController(nibName: "FamilyMemberListViewController", bundle: nil)
-        navigationController?.pushViewController(FamilyList, animated: true)
+        let familyList = FamilyMemberListViewController(
+            nibName: "FamilyMemberListViewController",
+            bundle: nil
+        )
+        familyList.group = group
+        navigationController?.pushViewController(
+            familyList,
+            animated: true
+        )
     }
+    
     @IBAction func FamilyMemberChevronPressed(_ sender: UIButton) {
-        let FamilyList = FamilyMemberListViewController(nibName: "FamilyMemberListViewController", bundle: nil)
-        navigationController?.pushViewController(FamilyList, animated: true)
+        FamilyMemberPressed(sender)
     }
     
     @IBAction func profileButtonPressed(_ sender: UIButton) {
@@ -122,28 +148,34 @@ class FamilyMemberViewController: UIViewController {
         nav.modalPresentationStyle = .pageSheet
         
         if let sheet = nav.sheetPresentationController {
-            // Only large detent (full height)
             sheet.detents = [.large()]
             sheet.selectedDetentIdentifier = .large
-            sheet.prefersScrollingExpandsWhenScrolledToEdge = true
-            sheet.largestUndimmedDetentIdentifier = .large
         }
 
         present(nav, animated: true)
-
     }
 }
 
+// MARK: - CollectionView DataSource & Delegate
 extension FamilyMemberViewController: UICollectionViewDataSource, UICollectionViewDelegate {
 
-    func numberOfSections(in collectionView: UICollectionView) -> Int { return 1 }
-
-    func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return collectionView == membersCollectionView ? members.count : posts.count
+    func numberOfSections(in collectionView: UICollectionView) -> Int {
+        return 1
     }
 
-    func collectionView(_ collectionView: UICollectionView,
-                        cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
+    func collectionView(
+        _ collectionView: UICollectionView,
+        numberOfItemsInSection section: Int
+    ) -> Int {
+        return collectionView == membersCollectionView
+            ? members.count
+            : posts.count
+    }
+
+    func collectionView(
+        _ collectionView: UICollectionView,
+        cellForItemAt indexPath: IndexPath
+    ) -> UICollectionViewCell {
 
         if collectionView == membersCollectionView {
             let cell = collectionView.dequeueReusableCell(
@@ -152,7 +184,10 @@ extension FamilyMemberViewController: UICollectionViewDataSource, UICollectionVi
             ) as! FamilyMemberCollectionViewCell
 
             let member = members[indexPath.item]
-            cell.configure(name: member.name, image: UIImage(named: member.imageName))
+            cell.configure(
+                name: member.name,
+                image: UIImage(named: member.imageName)
+            )
             return cell
         }
 
@@ -170,7 +205,10 @@ extension FamilyMemberViewController: UICollectionViewDataSource, UICollectionVi
         return cell
     }
 
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+    func collectionView(
+        _ collectionView: UICollectionView,
+        didSelectItemAt indexPath: IndexPath
+    ) {
         if collectionView == membersCollectionView {
             print("Tapped Member:", members[indexPath.item].name)
         } else {

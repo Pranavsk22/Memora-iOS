@@ -5,13 +5,36 @@ struct UserProfile: Codable, Identifiable {
     let id: String
     let name: String
     let email: String
-    let createdAt: Date
+    let createdAt: Date?
+    let updatedAt: Date?
     
+    // Make createdAt optional and add explicit CodingKeys
     enum CodingKeys: String, CodingKey {
         case id, name, email
         case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+    
+    // Add custom init to handle missing createdAt
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        email = try container.decode(String.self, forKey: .email)
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
+    }
+    
+    // ADD THIS: Custom initializer for creating profiles manually
+    init(id: String, name: String, email: String, createdAt: Date? = nil, updatedAt: Date? = nil) {
+        self.id = id
+        self.name = name
+        self.email = email
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 }
+
 
 // MARK: - Daily Prompt
 struct DailyPrompt: Codable, Identifiable {
@@ -125,38 +148,40 @@ struct GroupMemory: Codable, Identifiable {
     }
 }
 
-// MARK: - Static Demo Models
 
-// For static authentication
-struct DemoUser: Codable, Identifiable {
+
+// MARK: - Join Request Models
+struct JoinRequest: Codable, Identifiable {
     let id: String
-    let name: String
-    let email: String
-    let password: String
-    let createdAt: Date
+    let groupId: String
+    let userId: String
+    let status: String
+    let requestedAt: Date
+    let reviewedAt: Date?
+    let reviewedBy: String?
+    let userName: String?
+    let userEmail: String?
     
-    init(id: String, name: String, email: String, password: String = "password123") {
-        self.id = id
-        self.name = name
-        self.email = email
-        self.password = password
-        self.createdAt = Date()
+    enum CodingKeys: String, CodingKey {
+        case id
+        case groupId = "group_id"
+        case userId = "user_id"
+        case status
+        case requestedAt = "requested_at"
+        case reviewedAt = "reviewed_at"
+        case reviewedBy = "reviewed_by"
+        case userName = "user_name"
+        case userEmail = "user_email"
     }
 }
 
-// For memory storage
-struct DemoMemory: Codable, Identifiable {
-    let id: String
-    let title: String
-    let content: String?
-    let category: String
-    let createdAt: Date
-}
-
-// For static group members
-struct DemoGroupMembership {
+// For creating join requests
+struct CreateJoinRequest: Codable {
     let groupId: String
     let userId: String
-    let isAdmin: Bool
-    let joinedAt: Date
+    
+    enum CodingKeys: String, CodingKey {
+        case groupId = "group_id"
+        case userId = "user_id"
+    }
 }

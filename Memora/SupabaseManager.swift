@@ -1,0 +1,1738 @@
+//
+//  SupabaseManager.swift
+//  Memora
+//
+//  Created by user@3 on 20/01/26.
+//
+
+
+import Foundation
+import Supabase
+
+class SupabaseManager {
+    static let shared = SupabaseManager()
+    
+    let client: SupabaseClient
+    private(set) var currentUser: User?
+    
+    public let jsonDecoder: JSONDecoder = {
+        let decoder = JSONDecoder()
+        
+        // IMPORTANT: Use .convertFromSnakeCase for automatic conversion
+        //decoder.keyDecodingStrategy = .convertFromSnakeCase
+        
+        // Date handling
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let dateString = try container.decode(String.self)
+            
+            if let date = formatter.date(from: dateString) {
+                return date
+            }
+            
+            // Try without fractional seconds
+            let fallbackFormatter = ISO8601DateFormatter()
+            fallbackFormatter.formatOptions = [.withInternetDateTime]
+            if let date = fallbackFormatter.date(from: dateString) {
+                return date
+            }
+            
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Cannot decode date string: \(dateString)"
+            )
+        }
+        
+        return decoder
+    }()
+    
+    private init() {
+        //  REPLACE THESE WITH YOUR ACTUAL VALUES
+        let supabaseUrl = "https://rphfhugkmcycarakepvb.supabase.co"
+        let supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJwaGZodWdrbWN5Y2FyYWtlcHZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc4NDQ5NzUsImV4cCI6MjA4MzQyMDk3NX0.KjYhMxIp1LgKDZ8II31oAyjszVJwURhQZAFn4WAyF9w"
+        
+        self.client = SupabaseClient(
+            supabaseURL: URL(string: supabaseUrl)!,
+            supabaseKey: supabaseKey
+        )
+        
+        // Load current user on init
+        loadCurrentUser()
+    }
+    
+    // MARK: - Current User Management
+    private func loadCurrentUser() {
+        Task {
+            do {
+                let session = try await client.auth.session
+                self.currentUser = session.user
+            } catch {
+                print("No current session: \(error)")
+                self.currentUser = nil
+            }
+        }
+    }
+    
+    func getCurrentUserId() -> String? {
+        return currentUser?.id.uuidString
+    }
+    
+    func isUserLoggedIn() -> Bool {
+        return getCurrentUserId() != nil
+    }
+    
+    func getCurrentUserEmail() -> String? {
+        return currentUser?.email
+    }
+    
+    // MARK: - Authentication
+    func signUp(name: String, email: String, password: String) async throws {
+        print("Signing up user: \(email)")
+        
+        do {
+            // 1. Create auth user
+            let authResponse = try await client.auth.signUp(
+                email: email,
+                password: password
+            )
+            
+            // Get the user directly - it's not optional in newer Supabase SDK versions
+            let user = authResponse.user
+            let newUserId = user.id.uuidString
+            
+            print("Auth user created with ID: \(newUserId)")
+            
+            // 2. Sign in to establish session
+            try await client.auth.signIn(email: email, password: password)
+            
+            // Update current user
+            let session = try await client.auth.session
+            self.currentUser = session.user
+            
+            // 3. Create profile WITH THE AUTH USER'S ID
+            try await createUserProfile(userId: newUserId, name: name, email: email)
+            
+            print("Sign up completed successfully for user: \(newUserId)")
+            
+        } catch {
+            print("Sign up error: \(error)")
+            throw error
+        }
+    }
+
+    
+    
+    func signIn(email: String, password: String) async throws {
+        do {
+            _ = try await client.auth.signIn(email: email, password: password)
+            // Update current user
+            let session = try await client.auth.session
+            self.currentUser = session.user
+        } catch {
+            print("Sign in error: \(error)")
+            throw error
+        }
+    }
+    
+    func signOut() async throws {
+        do {
+            try await client.auth.signOut()
+            self.currentUser = nil
+        } catch {
+            print("Sign out error: \(error)")
+            throw error
+        }
+    }
+    
+    // MARK: - Profile Management
+    // Update createUserProfile to handle duplicates properly
+    func createUserProfile(userId: String, name: String, email: String) async throws {
+        print("Creating profile for user ID: \(userId)")
+        
+        do {
+            // Use upsert to handle duplicates gracefully
+            try await client
+                .from("profiles")
+                .upsert([
+                    "id": userId,
+                    "name": name,
+                    "email": email
+                ])
+                .execute()
+            
+            print("Profile created/updated successfully for \(userId)")
+            
+        } catch {
+            print("Profile creation error: \(error)")
+            
+            // If it's a duplicate, that's okay - profile already exists
+            let errorString = error.localizedDescription.lowercased()
+            if errorString.contains("duplicate") || errorString.contains("already exists") {
+                print("Profile already exists (this is okay)")
+                return
+            }
+            
+            throw error
+        }
+    }
+    
+    func getUserProfile() async throws -> UserProfile? {
+        guard let userId = getCurrentUserId() else {
+            return nil
+        }
+        
+        do {
+            let response = try await client
+                .from("profiles")
+                .select()
+                .eq("id", value: userId)
+                .single()
+                .execute()
+            
+            // Use the shared jsonDecoder instead of creating a new one
+            return try jsonDecoder.decode(UserProfile.self, from: response.data)
+        } catch {
+            print("Error fetching profile: \(error)")
+            return nil
+        }
+    }
+    
+    
+    func ensureUserProfileExists(userId: String) async throws {
+        print("Ensuring profile exists for user: \(userId)")
+        
+        do {
+            // First, try to get the existing profile
+            let response = try await client
+                .from("profiles")
+                .select("id, name, email")
+                .eq("id", value: userId)
+                .single()
+                .execute()
+            
+            print("Profile exists for user \(userId)")
+            
+        } catch {
+            // Profile doesn't exist or other error
+            print("Profile doesn't exist for user \(userId), creating one...")
+            
+            // Get user email from auth table
+            var userEmail = "user@example.com"
+            var userName = "New User"
+            
+            do {
+                let authResponse = try await client
+                    .from("auth.users")
+                    .select("email")
+                    .eq("id", value: userId)
+                    .single()
+                    .execute()
+                
+                if let authDict = try? JSONSerialization.jsonObject(with: authResponse.data) as? [String: Any] {
+                    userEmail = authDict["email"] as? String ?? "user@example.com"
+                    // Use email prefix as name
+                    userName = userEmail.components(separatedBy: "@").first ?? "New User"
+                }
+            } catch {
+                print("Could not get auth user info: \(error)")
+            }
+            
+            // Create a profile
+            do {
+                try await client
+                    .from("profiles")
+                    .insert([
+                        "id": userId,
+                        "name": userName,
+                        "email": userEmail
+                    ])
+                    .execute()
+                
+                print("Created profile for user \(userId): \(userName) (\(userEmail))")
+                
+            } catch {
+                print("Failed to create profile: \(error)")
+                
+                // If it's a duplicate error, that's okay - profile might have been created by another process
+                let errorString = error.localizedDescription.lowercased()
+                if errorString.contains("duplicate") || errorString.contains("already exists") {
+                    print("Profile already exists (this is okay)")
+                    return
+                }
+                
+                throw error
+            }
+        }
+    }
+    
+    
+    
+    func createProfileForExistingUser(userId: String, name: String? = nil, email: String? = nil) async throws {
+        print("Creating profile for existing user: \(userId)")
+        
+        var userName = name ?? "User"
+        var userEmail = email ?? "user@example.com"
+        
+        // If we don't have name/email, try to get from auth table
+        if name == nil || email == nil {
+            do {
+                // Note: This requires RLS policies to allow reading auth.users
+                let response = try await client
+                    .from("auth.users")
+                    .select("email")
+                    .eq("id", value: userId)
+                    .single()
+                    .execute()
+                
+                if let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
+                   let authEmail = json["email"] as? String {
+                    userEmail = authEmail
+                    userName = authEmail.components(separatedBy: "@").first ?? "User"
+                }
+            } catch {
+                print("Could not get user info from auth: \(error)")
+                // Use defaults
+            }
+        }
+        
+        // Create the profile
+        try await createUserProfile(userId: userId, name: userName, email: userEmail)
+    }
+    
+    
+    func checkAndFixUserProfile(userId: String) async {
+        print("Checking user profile for: \(userId)")
+        
+        do {
+            let profileExists = try await client
+                .from("profiles")
+                .select("count")
+                .eq("id", value: userId)
+                .single()
+                .execute()
+            
+            if let json = try? JSONSerialization.jsonObject(with: profileExists.data) as? [String: Any],
+               let count = json["count"] as? Int, count > 0 {
+                print("User \(userId) has a profile")
+            } else {
+                print("User \(userId) does NOT have a profile")
+                // Create one
+                try await ensureUserProfileExists(userId: userId)
+            }
+        } catch {
+            print("Error checking profile: \(error)")
+        }
+    }
+    
+    // MARK: - Test Connection
+    func testConnection() async -> Bool {
+        do {
+            _ = try await client
+                .from("profiles")
+                .select("count")
+                .limit(1)
+                .execute()
+            
+            print("Supabase connection successful")
+            return true
+        } catch {
+            print("Supabase connection failed: \(error)")
+            return false
+        }
+    }
+    
+
+    // MARK: - Groups
+    func createGroup(name: String) async throws -> UserGroup {
+        print(" DEBUG createGroup: Starting with name: \(name)")
+        
+        guard let userId = getCurrentUserId() else {
+            print(" DEBUG createGroup: No user ID found")
+            throw NSError(domain: "No user logged in", code: 401)
+        }
+        
+        print(" DEBUG createGroup: User ID: \(userId)")
+        
+        let code = generateGroupCode()
+        print(" DEBUG createGroup: Generated code: \(code)")
+        
+        do {
+            print(" DEBUG createGroup: Calling PostgreSQL function...")
+            
+            let response = try await client
+                .rpc("create_group_with_admin", params: [
+                    "group_name": name,
+                    "group_code": code,
+                    "user_id": userId
+                ])
+                .execute()
+            
+            print("DEBUG createGroup: Function call successful")
+            let jsonString = String(data: response.data, encoding: .utf8) ?? "No data"
+            print(" DEBUG createGroup: Response data: \(jsonString)")
+            
+            // Try manual decoding first
+            do {
+                let groups = try jsonDecoder.decode([UserGroup].self, from: response.data)
+                
+                guard let group = groups.first else {
+                    print(" DEBUG createGroup: No group returned from function")
+                    throw NSError(domain: "No group created", code: 500)
+                }
+                
+                print(" DEBUG createGroup: Group created: \(group.name), ID: \(group.id), Code: \(group.code)")
+                return group
+                
+            } catch {
+                print(" DEBUG createGroup: Standard decoding failed, trying manual...")
+                
+                // Manual decoding as fallback
+                guard let jsonObject = try JSONSerialization.jsonObject(with: response.data) as? [[String: Any]],
+                      let firstGroup = jsonObject.first,
+                      let id = firstGroup["id"] as? String,
+                      let name = firstGroup["name"] as? String,
+                      let code = firstGroup["code"] as? String,
+                      let createdBy = firstGroup["created_by"] as? String,
+                      let adminId = firstGroup["admin_id"] as? String,
+                      let createdAtString = firstGroup["created_at"] as? String else {
+                    throw NSError(domain: "Failed to parse response", code: 500)
+                }
+                
+                // Parse date
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                guard let createdAt = formatter.date(from: createdAtString) else {
+                    throw NSError(domain: "Failed to parse date", code: 500)
+                }
+                
+                let group = UserGroup(
+                    id: id,
+                    name: name,
+                    code: code,
+                    createdBy: createdBy,
+                    adminId: adminId,
+                    createdAt: createdAt
+                )
+                
+                print(" DEBUG createGroup: Manually decoded group: \(group.name)")
+                return group
+            }
+            
+        } catch {
+            print(" DEBUG createGroup: Error: \(error)")
+            print(" DEBUG createGroup: Error localized: \(error.localizedDescription)")
+            
+            throw error
+        }
+    }
+
+    func joinGroup(code: String) async throws -> UserGroup {
+        print("Looking for group with code: '\(code)'")
+        
+        guard let userId = getCurrentUserId() else {
+            throw NSError(domain: "No user logged in", code: 401)
+        }
+        
+        do {
+            // Find group by code - don't use .single() yet
+            let groupResponse = try await client
+                .from("groups")
+                .select()
+                .eq("code", value: code.uppercased())
+                .execute()
+            
+            print("Response: \(String(data: groupResponse.data, encoding: .utf8) ?? "No data")")
+            
+            // First, try to decode as array
+            if let jsonArray = try? JSONSerialization.jsonObject(with: groupResponse.data) as? [[String: Any]] {
+                print("Found \(jsonArray.count) groups")
+                
+                guard let firstGroup = jsonArray.first else {
+                    throw NSError(domain: "Group not found", code: 404, userInfo: [
+                        NSLocalizedDescriptionKey: "Invalid group code"
+                    ])
+                }
+                
+                // Debug print all keys
+                print("Keys in response: \(firstGroup.keys)")
+                for (key, value) in firstGroup {
+                    print("  \(key): \(value) (\(type(of: value)))")
+                }
+                
+                // Manual decoding
+                guard let id = firstGroup["id"] as? String,
+                      let name = firstGroup["name"] as? String,
+                      let code = firstGroup["code"] as? String,
+                      let createdBy = firstGroup["created_by"] as? String,
+                      let adminId = firstGroup["admin_id"] as? String,
+                      let createdAtString = firstGroup["created_at"] as? String else {
+                    throw NSError(domain: "Invalid group data", code: 500)
+                }
+                
+                // Parse date
+                let formatter = ISO8601DateFormatter()
+                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                guard let createdAt = formatter.date(from: createdAtString) else {
+                    throw NSError(domain: "Invalid date format", code: 500)
+                }
+                
+                let group = UserGroup(
+                    id: id,
+                    name: name,
+                    code: code,
+                    createdBy: createdBy,
+                    adminId: adminId,
+                    createdAt: createdAt
+                )
+                
+                print("Manually decoded group: \(group.name) (ID: \(group.id))")
+                
+                // Check if user is already a member
+                do {
+                    let existingMemberCheck = try await client
+                        .from("group_members")
+                        .select()
+                        .eq("group_id", value: group.id)
+                        .eq("user_id", value: userId)
+                        .execute()
+                    
+                    if let memberArray = try? JSONSerialization.jsonObject(with: existingMemberCheck.data) as? [[String: Any]],
+                       !memberArray.isEmpty {
+                        print("User is already a member of this group")
+                        return group
+                    }
+                    
+                } catch {
+                    print("No existing membership found")
+                }
+                
+                // Add user as member
+                let isAdmin = (userId.lowercased() == group.adminId.lowercased())
+                try await addGroupMember(groupId: group.id, userId: userId, isAdmin: isAdmin)
+                print("Successfully added user to group")
+                
+                return group
+                
+            } else {
+                throw NSError(domain: "Invalid response", code: 500)
+            }
+            
+        } catch {
+            print("Error finding group: \(error)")
+            
+            if let supabaseError = error as? PostgrestError,
+               supabaseError.code == "PGRST116" {
+                throw NSError(domain: "Group not found", code: 404, userInfo: [
+                    NSLocalizedDescriptionKey: "Invalid or expired group code"
+                ])
+            }
+            
+            throw error
+        }
+    }
+
+    func getMyGroups() async throws -> [UserGroup] {
+        print("getMyGroups: Starting...")
+        
+        guard let userId = getCurrentUserId() else {
+            print("No user ID")
+            return getDemoGroups() // Fall back to demo
+        }
+        
+        do {
+            // Get groups where user is admin OR creator OR member
+            // First, get groups where user is admin/creator
+            let adminCreatorResponse = try await client
+                .from("groups")
+                .select()
+                .or("admin_id.eq.\(userId),created_by.eq.\(userId)")
+                .execute()
+            
+            print("Admin/creator query successful")
+            
+            // Parse admin/creator groups
+            var allGroups: [UserGroup] = []
+            
+            if let adminGroups = try? jsonDecoder.decode([UserGroup].self, from: adminCreatorResponse.data) {
+                allGroups.append(contentsOf: adminGroups)
+                print("Found \(adminGroups.count) admin/creator groups")
+            }
+            
+            // Now get groups where user is a member (not admin/creator)
+            do {
+                let memberResponse = try await client
+                    .from("group_members")
+                    .select("""
+                        groups(*)
+                    """)
+                    .eq("user_id", value: userId)
+                    .execute()
+                
+                print("Member query successful")
+                
+                // Parse the nested response
+                struct MemberGroupWrapper: Codable {
+                    let groups: UserGroup
+                }
+                
+                if let memberGroups = try? jsonDecoder.decode([MemberGroupWrapper].self, from: memberResponse.data) {
+                    let memberUserGroups = memberGroups.map { $0.groups }
+                    
+                    // Filter out duplicates (in case user is both member and admin)
+                    let newGroups = memberUserGroups.filter { memberGroup in
+                        !allGroups.contains { $0.id == memberGroup.id }
+                    }
+                    
+                    allGroups.append(contentsOf: newGroups)
+                    print("Found \(newGroups.count) member-only groups")
+                }
+            } catch {
+                print("Error fetching member groups: \(error)")
+                // Continue with just admin/creator groups
+            }
+            
+            if allGroups.isEmpty {
+                print("No real groups found, showing demo groups")
+                return getDemoGroups()
+            }
+            
+            print("Total groups found: \(allGroups.count)")
+            return allGroups
+            
+        } catch {
+            print("Query failed: \(error.localizedDescription)")
+            print("Falling back to demo groups...")
+            return getDemoGroups()
+        }
+    }
+
+    public func getDemoGroups() -> [UserGroup] {
+        print(" DEMO: Creating demo groups")
+        
+        guard let userId = getCurrentUserId() else {
+            // Create a truly dummy group if no user ID
+            let dummyGroup = UserGroup(
+                id: UUID().uuidString,
+                name: "Sample Family",
+                code: "SAMPLE123",
+                createdBy: "demo_user",
+                adminId: "demo_user",
+                createdAt: Date()
+            )
+            return [dummyGroup]
+        }
+        
+        // Create demo groups based on real user ID
+        let demoGroup1 = UserGroup(
+            id: UUID().uuidString,
+            name: "My Family",
+            code: "FAMILY",
+            createdBy: userId,
+            adminId: userId,
+            createdAt: Date().addingTimeInterval(-86400) // 1 day ago
+        )
+        
+        let demoGroup2 = UserGroup(
+            id: UUID().uuidString,
+            name: "Friends Group",
+            code: "FRIENDS",
+            createdBy: userId,
+            adminId: userId,
+            createdAt: Date().addingTimeInterval(-172800) // 2 days ago
+        )
+        
+        return [demoGroup1, demoGroup2]
+    }
+
+    // Alternative: If you need to show groups where user is just a member (not admin)
+    func getAllMyGroups() async throws -> [UserGroup] {
+        guard let userId = getCurrentUserId() else {
+            return []
+        }
+        
+        print(" DEBUG getAllMyGroups: Starting for user: \(userId)")
+        
+        do {
+            // Get groups where user is admin/creator
+            let adminResponse = try await client
+                .from("groups")
+                .select()
+                .or("admin_id.eq.\(userId),created_by.eq.\(userId)")
+                .execute()
+            
+            let adminGroups = try jsonDecoder.decode([UserGroup].self, from: adminResponse.data)
+            print(" DEBUG getAllMyGroups: Found \(adminGroups.count) admin/creator groups")
+            
+            // For member groups, we'll handle them separately via API call
+            // or show a loading state first
+            return adminGroups
+            
+        } catch {
+            print(" DEBUG getAllMyGroups: Error: \(error)")
+            return []
+        }
+    }
+    
+    func getMyGroupsForDemo() async throws -> [UserGroup] {
+        print("🎯 DEMO MODE: Getting groups with workaround")
+        
+        // For demo purposes, let's cache groups in UserDefaults
+        let defaults = UserDefaults.standard
+        
+        // Check if we have cached groups
+        if let cachedData = defaults.data(forKey: "cached_groups"),
+           let cachedGroups = try? jsonDecoder.decode([UserGroup].self, from: cachedData) {
+            print("🎯 DEMO: Returning \(cachedGroups.count) cached groups")
+            return cachedGroups
+        }
+        
+        // If no cache, create a dummy group for demo
+        let dummyGroup = UserGroup(
+            id: UUID().uuidString,
+            name: "Demo Family",
+            code: "DEMO123",
+            createdBy: getCurrentUserId() ?? "demo_user",
+            adminId: getCurrentUserId() ?? "demo_user",
+            createdAt: Date()
+        )
+        
+        let demoGroups = [dummyGroup]
+        
+        // Cache for next time
+        if let encoded = try? JSONEncoder().encode(demoGroups) {
+            defaults.set(encoded, forKey: "cached_groups")
+        }
+        
+        print("🎯 DEMO: Created \(demoGroups.count) demo groups")
+        return demoGroups
+    }
+
+    func getGroupMembers(groupId: String) async throws -> [GroupMember] {
+        do {
+            let response = try await client
+                .from("group_members")
+                .select("""
+                    user_id, 
+                    is_admin, 
+                    joined_at, 
+                    profiles!inner(id, name, email)
+                """)
+                .eq("group_id", value: groupId)
+                .execute()
+            
+            print("Group members raw response: \(String(data: response.data, encoding: .utf8) ?? "")")
+            
+            // Parse manually first to debug
+            if let jsonArray = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] {
+                print("Found \(jsonArray.count) members in raw response")
+                for member in jsonArray {
+                    print("  Member: \(member)")
+                }
+            }
+            
+            // Use a simpler approach - decode manually
+            guard let jsonArray = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] else {
+                print("Could not parse group members response")
+                return []
+            }
+            
+            var members: [GroupMember] = []
+            let dateFormatter = ISO8601DateFormatter()
+            dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            
+            for item in jsonArray {
+                guard let userId = item["user_id"] as? String,
+                      let isAdminValue = item["is_admin"],
+                      let joinedAtString = item["joined_at"] as? String,
+                      let profilesDict = item["profiles"] as? [String: Any],
+                      let userName = profilesDict["name"] as? String,
+                      let userEmail = profilesDict["email"] as? String else {
+                    print("Skipping invalid member data")
+                    continue
+                }
+                
+                // Convert isAdmin to Bool (it could be 1/0 or true/false)
+                let isAdmin: Bool
+                if let boolValue = isAdminValue as? Bool {
+                    isAdmin = boolValue
+                } else if let intValue = isAdminValue as? Int {
+                    isAdmin = intValue == 1
+                } else if let stringValue = isAdminValue as? String {
+                    isAdmin = stringValue.lowercased() == "true" || stringValue == "1"
+                } else {
+                    isAdmin = false
+                }
+                
+                let joinedAt = dateFormatter.date(from: joinedAtString) ?? Date()
+                
+                let member = GroupMember(
+                    id: userId,
+                    name: userName,
+                    email: userEmail,
+                    isAdmin: isAdmin,
+                    joinedAt: joinedAt
+                )
+                members.append(member)
+            }
+            
+            print("Successfully parsed \(members.count) members")
+            return members
+            
+        } catch {
+            print("Error fetching group members: \(error)")
+            throw error
+        }
+    }
+    
+
+    func addGroupMember(groupId: String, userId: String, isAdmin: Bool = false) async throws {
+        // Use AnyJSON to handle the boolean properly
+        let data: [String: AnyJSON] = [
+            "group_id": .string(groupId),
+            "user_id": .string(userId),
+            "is_admin": .bool(isAdmin)
+        ]
+        
+        try await client
+            .from("group_members")
+            .insert(data)
+            .execute()
+    }
+
+    func removeGroupMember(groupId: String, userId: String) async throws {
+        try await client
+            .from("group_members")
+            .delete()
+            .eq("group_id", value: groupId)
+            .eq("user_id", value: userId)
+            .execute()
+    }
+
+    func deleteGroup(groupId: String) async throws {
+        try await client
+            .from("groups")
+            .delete()
+            .eq("id", value: groupId)
+            .execute()
+    }
+
+    func updateGroupAdmin(groupId: String, userId: String, isAdmin: Bool) async throws {
+        print("updateGroupAdmin: Updating admin status for user \(userId) to \(isAdmin)")
+        
+        // Step 1: Update group_members table
+        let memberData: [String: AnyJSON] = [
+            "is_admin": .bool(isAdmin)
+        ]
+        
+        try await client
+            .from("group_members")
+            .update(memberData)
+            .eq("group_id", value: groupId)
+            .eq("user_id", value: userId)
+            .execute()
+        
+        print("updateGroupAdmin: Updated group_members table")
+        
+        // Step 2: If making admin, ALSO update the groups table's admin_id
+        if isAdmin {
+            let groupData: [String: AnyJSON] = [
+                "admin_id": .string(userId)
+            ]
+            
+            try await client
+                .from("groups")
+                .update(groupData)
+                .eq("id", value: groupId)
+                .execute()
+            
+            print("updateGroupAdmin: Updated groups table admin_id to \(userId)")
+        } else {
+            // If removing admin and this user was the main admin in groups table,
+            // we need to assign a new admin. Let's pick the first other admin.
+            // For now, we'll leave it - this is a more complex scenario.
+            print("updateGroupAdmin: User removed as admin, but groups table not updated (needs new admin assignment)")
+        }
+    }
+    
+    
+    // MARK: - Join Requests
+    func createJoinRequest(groupId: String) async throws {
+        guard let userId = getCurrentUserId() else {
+            throw NSError(domain: "No user logged in", code: 401)
+        }
+        
+        print("createJoinRequest: Creating request for group: \(groupId), user: \(userId)")
+        
+        // FIRST: Ensure the user has a profile
+        try await ensureUserProfileExists(userId: userId)
+        
+        // Check if user already has a pending request
+        do {
+            let existingResponse = try await client
+                .from("join_requests")
+                .select("*")
+                .eq("group_id", value: groupId)
+                .eq("user_id", value: userId)
+                .eq("status", value: "pending")
+                .execute()
+            
+            if let jsonArray = try? JSONSerialization.jsonObject(with: existingResponse.data) as? [[String: Any]],
+               !jsonArray.isEmpty {
+                print("User already has a pending request for this group")
+                throw NSError(domain: "Already requested", code: 409, userInfo: [
+                    NSLocalizedDescriptionKey: "You already have a pending request to join this group"
+                ])
+            }
+        } catch {
+            print("Error checking existing requests: \(error)")
+        }
+        
+        // Create the join request
+        do {
+            let response = try await client
+                .from("join_requests")
+                .insert([
+                    "group_id": groupId,
+                    "user_id": userId,
+                    "status": "pending"
+                ])
+                .select()
+                .execute()
+            
+            print("createJoinRequest: Request created successfully")
+            
+        } catch {
+            print("createJoinRequest: Error: \(error)")
+            if let supabaseError = error as? PostgrestError {
+                print("Error code: \(supabaseError.code ?? "No code")")
+                print("Error message: \(supabaseError.message)")
+            }
+            throw error
+        }
+    }
+
+    func getPendingJoinRequests(groupId: String) async throws -> [JoinRequest] {
+        print("getPendingJoinRequests: Fetching for group: \(groupId)")
+        
+        do {
+            // Try Method 1: Simple join query
+            let response = try await client
+                .from("join_requests")
+                .select("""
+                    *,
+                    profiles(id, name, email)
+                """)
+                .eq("group_id", value: groupId)
+                .eq("status", value: "pending")
+                .order("requested_at", ascending: false)
+                .execute()
+            
+            let responseString = String(data: response.data, encoding: .utf8) ?? "No data"
+            print("Join requests response: \(responseString)")
+            
+            // Try to parse with a flexible decoder
+            if let jsonArray = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] {
+                print("Successfully parsed as JSON array with \(jsonArray.count) items")
+                
+                // Process each item manually
+                var joinRequests: [JoinRequest] = []
+                
+                for item in jsonArray {
+                    // Extract join request data
+                    guard let id = item["id"] as? String,
+                          let groupId = item["group_id"] as? String,
+                          let userId = item["user_id"] as? String,
+                          let status = item["status"] as? String,
+                          let requestedAtString = item["requested_at"] as? String else {
+                        continue
+                    }
+                    
+                    // Parse date
+                    let formatter = ISO8601DateFormatter()
+                    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    guard let requestedAt = formatter.date(from: requestedAtString) else {
+                        continue
+                    }
+                    
+                    let reviewedAtString = item["reviewed_at"] as? String
+                    let reviewedAt = reviewedAtString.flatMap { formatter.date(from: $0) }
+                    let reviewedBy = item["reviewed_by"] as? String
+                    
+                    // Extract profile data
+                    var userName: String? = nil
+                    var userEmail: String? = nil
+                    
+                    if let profiles = item["profiles"] as? [String: Any] {
+                        userName = profiles["name"] as? String
+                        userEmail = profiles["email"] as? String
+                    }
+                    
+                    let request = JoinRequest(
+                        id: id,
+                        groupId: groupId,
+                        userId: userId,
+                        status: status,
+                        requestedAt: requestedAt,
+                        reviewedAt: reviewedAt,
+                        reviewedBy: reviewedBy,
+                        userName: userName ?? "Unknown User",
+                        userEmail: userEmail ?? "No email available"
+                    )
+                    joinRequests.append(request)
+                }
+                
+                print("Manually created \(joinRequests.count) join requests")
+                return joinRequests
+            }
+            
+            // If manual parsing fails, try the alternative method
+            print("Manual parsing failed, trying alternative method...")
+            return try await getPendingJoinRequestsAlternative(groupId: groupId)
+            
+        } catch {
+            print("getPendingJoinRequests error: \(error)")
+            print("Trying alternative method...")
+            return try await getPendingJoinRequestsAlternative(groupId: groupId)
+        }
+    }
+
+    private func getPendingJoinRequestsAlternative(groupId: String) async throws -> [JoinRequest] {
+        print("Using alternative method for join requests")
+        
+        // Method 1: First, get all pending requests
+        let requestsResponse = try await client
+            .from("join_requests")
+            .select("*")
+            .eq("group_id", value: groupId)
+            .eq("status", value: "pending")
+            .order("requested_at", ascending: false)
+            .execute()
+        
+        let requestsString = String(data: requestsResponse.data, encoding: .utf8) ?? "No data"
+        print("Raw join requests: \(requestsString)")
+        
+        // Parse the response manually first to debug
+        guard let jsonArray = try? JSONSerialization.jsonObject(with: requestsResponse.data) as? [[String: Any]] else {
+            print("Failed to parse join requests response")
+            return []
+        }
+        
+        print("Parsed manually as array with \(jsonArray.count) items")
+        
+        // Parse each request manually
+        var joinRequests: [JoinRequest] = []
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        for item in jsonArray {
+            guard let id = item["id"] as? String,
+                  let groupId = item["group_id"] as? String,
+                  let userId = item["user_id"] as? String,
+                  let status = item["status"] as? String,
+                  let requestedAtString = item["requested_at"] as? String else {
+                print("Skipping item - missing required fields")
+                continue
+            }
+            
+            // Parse dates
+            let requestedAt = dateFormatter.date(from: requestedAtString) ?? Date()
+            let reviewedAtString = item["reviewed_at"] as? String
+            let reviewedAt = reviewedAtString.flatMap { dateFormatter.date(from: $0) }
+            let reviewedBy = item["reviewed_by"] as? String
+            
+            // Now get the user's profile information - FIXED VERSION
+            var userName = "Unknown User"
+            var userEmail = "No email available"
+            
+            // Try to get the user's profile WITHOUT .single() - use regular query
+            do {
+                let profileResponse = try await client
+                    .from("profiles")
+                    .select("id, name, email")
+                    .eq("id", value: userId)
+                    .execute()
+                
+                if let profilesArray = try? JSONSerialization.jsonObject(with: profileResponse.data) as? [[String: Any]],
+                   let firstProfile = profilesArray.first {
+                    userName = firstProfile["name"] as? String ?? "Unknown User"
+                    userEmail = firstProfile["email"] as? String ?? "No email available"
+                    print("Found profile for \(userId): \(userName) (\(userEmail))")
+                } else {
+                    // Instead of just printing "No profile found", actually create one
+                    print("No profile found for user ID: \(userId) - creating one")
+
+                    do {
+                        // Try to create a profile for this user
+                        try await createProfileForExistingUser(userId: userId)
+                        
+                        // Now try to get the profile again
+                        let profileResponse = try await client
+                            .from("profiles")
+                            .select("id, name, email")
+                            .eq("id", value: userId)
+                            .single()
+                            .execute()
+                        
+                        if let profileDict = try? JSONSerialization.jsonObject(with: profileResponse.data) as? [String: Any] {
+                            userName = profileDict["name"] as? String ?? "User"
+                            userEmail = profileDict["email"] as? String ?? "No email"
+                            print("Created and retrieved profile for \(userId): \(userName)")
+                        }
+                    } catch {
+                        print("Failed to create profile for \(userId): \(error)")
+                        // Use default values
+                        userName = "User ID: \(String(userId.prefix(8)))..."
+                        userEmail = "No email available"
+                    }
+                }
+            } catch {
+                print("Error fetching profile: \(error.localizedDescription)")
+                // If we can't get profile, use a fallback
+                userName = "User \(String(userId.prefix(8)))"
+                userEmail = "user@example.com"
+            }
+            
+            let request = JoinRequest(
+                id: id,
+                groupId: groupId,
+                userId: userId,
+                status: status,
+                requestedAt: requestedAt,
+                reviewedAt: reviewedAt,
+                reviewedBy: reviewedBy,
+                userName: userName,
+                userEmail: userEmail
+            )
+            joinRequests.append(request)
+        }
+        
+        print("Alternative method returning \(joinRequests.count) requests")
+        return joinRequests
+    }
+    
+
+    // MARK: - Join Requests
+    func approveJoinRequest(requestId: String, groupId: String, userId: String) async throws {
+        print("Approving join request: \(requestId)")
+        
+        guard let currentUserId = getCurrentUserId() else {
+            throw NSError(domain: "No user logged in", code: 401)
+        }
+        
+        // Get current date as ISO8601 string
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let currentDateString = formatter.string(from: Date())
+        
+        // 1. Update join request status
+        try await client
+            .from("join_requests")
+            .update([
+                "status": "approved",
+                "reviewed_at": currentDateString,
+                "reviewed_by": currentUserId
+            ])
+            .eq("id", value: requestId)
+            .execute()
+        
+        // 2. Add user to group_members
+        try await addGroupMember(groupId: groupId, userId: userId, isAdmin: false)
+        
+        print("Join request approved and user added to group")
+    }
+
+    func rejectJoinRequest(requestId: String) async throws {
+        print("Rejecting join request: \(requestId)")
+        
+        guard let currentUserId = getCurrentUserId() else {
+            throw NSError(domain: "No user logged in", code: 401)
+        }
+        
+        // Get current date as ISO8601 string
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let currentDateString = formatter.string(from: Date())
+        
+        try await client
+            .from("join_requests")
+            .update([
+                "status": "rejected",
+                "reviewed_at": currentDateString,
+                "reviewed_by": currentUserId
+            ])
+            .eq("id", value: requestId)
+            .execute()
+        
+        print("Join request rejected")
+    }
+
+    func checkExistingJoinRequest(groupId: String) async throws -> Bool {
+        guard let userId = getCurrentUserId() else {
+            return false
+        }
+        
+        let response = try await client
+            .from("join_requests")
+            .select()
+            .eq("group_id", value: groupId)
+            .eq("user_id", value: userId)
+            .eq("status", value: "pending")
+            .execute()
+        
+        let requests = try jsonDecoder.decode([JoinRequest].self, from: response.data)
+        return !requests.isEmpty
+    }
+
+    func checkIfUserIsMember(groupId: String) async throws -> Bool {
+        guard let userId = getCurrentUserId() else {
+            return false
+        }
+        
+        let response = try await client
+            .from("group_members")
+            .select()
+            .eq("group_id", value: groupId)
+            .eq("user_id", value: userId)
+            .execute()
+        
+        // Check if we got any results
+        if let jsonArray = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] {
+            return !jsonArray.isEmpty
+        }
+        
+        return false
+    }
+    
+    //MARK: Group Memories
+    func getGroupMemories(groupId: String) async throws -> [GroupMemory] {
+        do {
+            let response = try await client
+                .from("group_memories") // Or your actual table name
+                .select("""
+                    id, user_id, group_id, title, content, 
+                    media_url, media_type, year, category, 
+                    created_at, profiles!inner(name)
+                """)
+                .eq("group_id", value: groupId)
+                .order("created_at", ascending: false)
+                .execute()
+            
+            print("Group memories raw response: \(String(data: response.data, encoding: .utf8) ?? "")")
+            
+            // Parse manually
+            guard let jsonArray = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] else {
+                print("Could not parse group memories response")
+                return []
+            }
+            
+            var memories: [GroupMemory] = []
+            let dateFormatter = ISO8601DateFormatter()
+            dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            
+            for item in jsonArray {
+                guard let id = item["id"] as? String,
+                      let userId = item["user_id"] as? String,
+                      let groupId = item["group_id"] as? String,
+                      let title = item["title"] as? String,
+                      let createdAtString = item["created_at"] as? String,
+                      let profilesDict = item["profiles"] as? [String: Any],
+                      let userName = profilesDict["name"] as? String else {
+                    print("Skipping invalid memory data")
+                    continue
+                }
+                
+                let content = item["content"] as? String
+                let mediaUrl = item["media_url"] as? String
+                let mediaType = item["media_type"] as? String
+                let year = item["year"] as? Int
+                let category = item["category"] as? String
+                let createdAt = dateFormatter.date(from: createdAtString) ?? Date()
+                
+                let memory = GroupMemory(
+                    id: id,
+                    userId: userId,
+                    groupId: groupId,
+                    title: title,
+                    content: content,
+                    mediaUrl: mediaUrl,
+                    mediaType: mediaType,
+                    year: year,
+                    category: category,
+                    createdAt: createdAt,
+                    userName: userName
+                )
+                memories.append(memory)
+            }
+            
+            print("Successfully parsed \(memories.count) memories")
+            return memories
+            
+        } catch {
+            print("Error fetching group memories: \(error)")
+            throw error
+        }
+    }
+    
+    // Add this to your SupabaseManager
+    func testEverything() async {
+        print("\n=== RUNNING COMPREHENSIVE TEST ===")
+        
+        // Test 1: Check if we can query
+        print("\n Testing basic query...")
+        do {
+            let testResponse = try await client
+                .from("groups")
+                .select("count")
+                .limit(1)
+                .execute()
+            print(" Basic query works")
+        } catch {
+            print(" Basic query failed: \(error)")
+        }
+        
+        // Test 2: Try to get groups
+        print("\n Testing getMyGroups...")
+        let groups = try? await getMyGroups()
+        print(" getMyGroups returned \(groups?.count ?? 0) groups")
+        
+        // Test 3: Create a test group
+        print("\n Testing group creation...")
+        do {
+            let testGroup = try await createGroup(name: "Test Group for Demo")
+            print(" Created group: \(testGroup.name) (\(testGroup.code))")
+        } catch {
+            print(" Group creation failed: \(error)")
+        }
+        
+        print("\n=== TEST COMPLETE ===")
+    }
+    
+    func testDecoding() async {
+        print(" TEST: Testing UserGroup decoding...")
+        
+        // Create a test JSON that matches what Supabase returns
+        let testJSON = """
+        [
+          {
+            "id": "4e2fd106-23b3-4042-946a-51fdf6b5cc87",
+            "name": "Happy Family",
+            "code": "IMJRLO",
+            "created_by": "bd2a2f49-e2a7-4c3a-a5fa-903ebc11f06b",
+            "admin_id": "bd2a2f49-e2a7-4c3a-a5fa-903ebc11f06b",
+            "created_at": "2026-01-12T12:00:24.690154+00:00"
+          }
+        ]
+        """.data(using: .utf8)!
+        
+        do {
+            let groups = try jsonDecoder.decode([UserGroup].self, from: testJSON)
+            print(" TEST: Successfully decoded \(groups.count) test groups")
+            for group in groups {
+                print("   - \(group.name): createdBy=\(group.createdBy), adminId=\(group.adminId)")
+            }
+        } catch {
+            print(" TEST: Failed to decode: \(error)")
+            
+            // Try without key conversion
+            let plainDecoder = JSONDecoder()
+            plainDecoder.dateDecodingStrategy = jsonDecoder.dateDecodingStrategy
+            
+            do {
+                struct PlainUserGroup: Codable {
+                    let id: String
+                    let name: String
+                    let code: String
+                    let created_by: String
+                    let admin_id: String
+                    let created_at: Date
+                }
+                
+                let plainGroups = try plainDecoder.decode([PlainUserGroup].self, from: testJSON)
+                print(" TEST: Successfully decoded with plain keys")
+                for group in plainGroups {
+                    print("   - \(group.name): created_by=\(group.created_by), admin_id=\(group.admin_id)")
+                }
+            } catch {
+                print(" TEST: Plain decoding also failed: \(error)")
+            }
+        }
+    }
+    
+    
+    func testGroupDecoding() async {
+        print(" TEST: Testing group decoding...")
+        
+        let testJSON = """
+        [{
+            "id": "cd26a0c0-3aea-46b4-abab-1abce519f84b",
+            "name": "mantosh family",
+            "code": "4ECBSH",
+            "created_by": "bd2a2f49-e2a7-4c3a-a5fa-903ebc11f06b",
+            "admin_id": "bd2a2f49-e2a7-4c3a-a5fa-903ebc11f06b",
+            "created_at": "2026-01-12T07:11:08.556524+00:00"
+        }]
+        """.data(using: .utf8)!
+        
+        do {
+            let groups = try jsonDecoder.decode([UserGroup].self, from: testJSON)
+            print(" TEST: Successfully decoded \(groups.count) groups")
+            for group in groups {
+                print("  - \(group.name), createdBy: \(group.createdBy), adminId: \(group.adminId)")
+            }
+        } catch {
+            print(" TEST: Failed to decode: \(error)")
+            
+            // Try with a custom decoder
+            let customDecoder = JSONDecoder()
+            customDecoder.keyDecodingStrategy = .useDefaultKeys
+            
+            do {
+                struct RawUserGroup: Codable {
+                    let id: String
+                    let name: String
+                    let code: String
+                    let created_by: String
+                    let admin_id: String
+                    let created_at: String
+                }
+                
+                let rawGroups = try customDecoder.decode([RawUserGroup].self, from: testJSON)
+                print(" TEST: Successfully decoded with raw keys")
+                for group in rawGroups {
+                    print("  - \(group.name), created_by: \(group.created_by), admin_id: \(group.admin_id)")
+                }
+            } catch {
+                print(" TEST: Raw decoding also failed: \(error)")
+            }
+        }
+    }
+    
+    func testGroupFetching() async {
+        print("\n TEST: Testing group fetching...")
+        
+        // Test 1: Get current user's groups
+        print("\n TEST 1: Fetching user's groups...")
+        do {
+            let groups = try await getMyGroups()
+            print(" TEST 1: Found \(groups.count) groups")
+            for group in groups {
+                print("  - \(group.name) (Admin: \(group.adminId == getCurrentUserId() ?? ""))")
+            }
+        } catch {
+            print(" TEST 1: Failed: \(error)")
+        }
+        
+        // Test 2: Direct query to groups table
+        print("\n TEST 2: Direct query to groups table...")
+        do {
+            let response = try await client
+                .from("groups")
+                .select()
+                .execute()
+            
+            let allGroups = try jsonDecoder.decode([UserGroup].self, from: response.data)
+            print(" TEST 2: Found \(allGroups.count) total groups in database")
+        } catch {
+            print(" TEST 2: Failed: \(error)")
+        }
+        
+        // Test 3: Check group_members table
+        print("\n TEST 3: Checking group_members table...")
+        do {
+            let response = try await client
+                .from("group_members")
+                .select()
+                .execute()
+            
+            print(" TEST 3: Group members response: \(String(data: response.data, encoding: .utf8) ?? "")")
+        } catch {
+            print(" TEST 3: Failed: \(error)")
+        }
+    }
+    
+    func testGroupsQuery() async {
+        print(" TEST: Testing groups query...")
+        
+        guard let userId = getCurrentUserId() else {
+            print(" TEST: No user ID")
+            return
+        }
+        
+        // Test 1: Direct query
+        do {
+            let response = try await client
+                .from("groups")
+                .select("id, name")
+                .eq("admin_id", value: userId)
+                .execute()
+            
+            print(" TEST 1: Direct admin query: \(String(data: response.data, encoding: .utf8) ?? "")")
+        } catch {
+            print(" TEST 1: Failed: \(error)")
+        }
+        
+        // Test 2: Created by query
+        do {
+            let response = try await client
+                .from("groups")
+                .select("id, name")
+                .eq("created_by", value: userId)
+                .execute()
+            
+            print(" TEST 2: Direct created_by query: \(String(data: response.data, encoding: .utf8) ?? "")")
+        } catch {
+            print(" TEST 2: Failed: \(error)")
+        }
+    }
+    
+    func testFindGroupByCode() async {
+        print("\n TEST: Testing group finding...")
+        
+        // Test with a code that definitely exists
+        let testCodes = ["IMJRLO", "TEST123", "B9FLFK", "E7KPNJ"]
+        
+        for code in testCodes {
+            print("\n Testing code: \(code)")
+            
+            do {
+                let response = try await client
+                    .from("groups")
+                    .select("*")
+                    .eq("code", value: code)
+                    .single()
+                    .execute()
+                
+                print(" Found group with code \(code)")
+                print(" Response: \(String(data: response.data, encoding: .utf8) ?? "No data")")
+                
+            } catch {
+                print(" Failed with code \(code): \(error)")
+                
+                // Try without .single()
+                do {
+                    let response = try await client
+                        .from("groups")
+                        .select("*")
+                        .eq("code", value: code)
+                        .execute()
+                    
+                    print(" Query without .single() succeeded")
+                    print(" Response: \(String(data: response.data, encoding: .utf8) ?? "No data")")
+                    
+                } catch {
+                    print(" Even without .single() failed: \(error)")
+                }
+            }
+        }
+    }
+    
+    func testJoinRequestCreation() async {
+        print("Testing join request creation...")
+        
+        // Use a test group ID that exists
+        let testGroupId = "aa258d88-713c-4429-b248-68be809f9e05" // admin testing 2
+        
+        print("Current user ID: \(SupabaseManager.shared.getCurrentUserId() ?? "No user")")
+        print("Testing with group ID: \(testGroupId)")
+        
+        do {
+            // Try to create a join request
+            try await SupabaseManager.shared.createJoinRequest(groupId: testGroupId)
+            print("Join request created successfully")
+            
+            // Check what's in the join_requests table
+            let response = try await SupabaseManager.shared.client
+                .from("join_requests")
+                .select("*")
+                .eq("group_id", value: testGroupId)
+                .execute()
+            
+            print("Join requests in table: \(String(data: response.data, encoding: .utf8) ?? "No data")")
+            
+        } catch {
+            print("Error: \(error)")
+            
+            // Check the exact error
+            if let supabaseError = error as? PostgrestError {
+                print("Supabase error code: \(supabaseError.code ?? "No code")")
+                print("Supabase error message: \(supabaseError.message)")
+                print("Supabase error detail: \(supabaseError.detail ?? "No detail")")
+            }
+        }
+    }
+    
+    func testAdminFlow() async {
+        print("\n=== TESTING ADMIN FLOW ===")
+        
+        // Test group (Happy Family)
+        let testGroupId = "4e2fd106-23b3-4042-946a-51fdf6b5cc87"
+        print("Testing with group ID: \(testGroupId)")
+        
+        print("\n1. Checking current user...")
+        let currentUserId = SupabaseManager.shared.getCurrentUserId()
+        print("   Current user ID: \(currentUserId ?? "No user")")
+        
+        print("\n2. Getting group info...")
+        do {
+            let groupResponse = try await client
+                .from("groups")
+                .select("*")
+                .eq("id", value: testGroupId)
+                .single()
+                .execute()
+            
+            let group = try jsonDecoder.decode(UserGroup.self, from: groupResponse.data)
+            print("   Group name: \(group.name)")
+            print("   Group admin ID: \(group.adminId)")
+            print("   Is current user admin? \(currentUserId?.lowercased() == group.adminId.lowercased())")
+            
+            print("\n3. Checking pending join requests...")
+            let requests = try await getPendingJoinRequests(groupId: testGroupId)
+            print("   Found \(requests.count) pending requests")
+            for request in requests {
+                print("   - \(request.userName ?? "Unknown"): \(request.userEmail ?? "No email")")
+            }
+            
+            print("\n4. Checking group members...")
+            let members = try await getGroupMembers(groupId: testGroupId)
+            print("   Found \(members.count) members")
+            for member in members {
+                print("   - \(member.name): \(member.isAdmin ? "Admin" : "Member")")
+            }
+            
+        } catch {
+            print("   Error: \(error)")
+        }
+        
+        print("\n=== TEST COMPLETE ===")
+    }
+    
+    func debugJoinRequestData() async {
+        print("\n=== DEBUGGING JOIN REQUEST DATA ===")
+        
+        // Test with a group that should have join requests
+        let testGroupId = "aa258d88-713c-4429-b248-68be809f9e05"
+        let testUserId = "b1263034-3827-49ca-ae2a-9e96944679dd"
+        
+        print("1. Testing join_requests table directly...")
+        do {
+            let response = try await client
+                .from("join_requests")
+                .select("*")
+                .eq("group_id", value: testGroupId)
+                .execute()
+            
+            print("Join requests in table: \(String(data: response.data, encoding: .utf8) ?? "No data")")
+            
+            if let jsonArray = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] {
+                print("Found \(jsonArray.count) join requests")
+                for (index, request) in jsonArray.enumerated() {
+                    print("  Request \(index):")
+                    for (key, value) in request {
+                        print("    \(key): \(value)")
+                    }
+                }
+            }
+        } catch {
+            print("Error: \(error)")
+        }
+        
+        print("\n2. Testing profiles table for user \(testUserId)...")
+        do {
+            let response = try await client
+                .from("profiles")
+                .select("*")
+                .eq("id", value: testUserId)
+                .single()
+                .execute()
+            
+            print("Profile data: \(String(data: response.data, encoding: .utf8) ?? "No data")")
+        } catch {
+            print("Error: \(error)")
+        }
+        
+        print("\n=== DEBUG COMPLETE ===")
+    }
+    
+    func debugGroupMembers() async {
+        print("\n=== DEBUGGING GROUP MEMBERS ===")
+        
+        let groupId = "4e2fd106-23b3-4042-946a-51fdf6b5cc87"
+        
+        print("1. Checking group_members table directly...")
+        do {
+            let response = try await client
+                .from("group_members")
+                .select("*")
+                .eq("group_id", value: groupId)
+                .execute()
+            
+            print("Group members: \(String(data: response.data, encoding: .utf8) ?? "No data")")
+            
+            if let jsonArray = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] {
+                print("Found \(jsonArray.count) group members")
+                for member in jsonArray {
+                    print("  - User: \(member["user_id"] ?? "No user"), Admin: \(member["is_admin"] ?? "No admin status")")
+                }
+            }
+        } catch {
+            print("Error: \(error)")
+        }
+        
+        print("\n2. Checking current user in group_members...")
+        if let currentUserId = SupabaseManager.shared.getCurrentUserId() {
+            do {
+                let response = try await client
+                    .from("group_members")
+                    .select("*")
+                    .eq("group_id", value: groupId)
+                    .eq("user_id", value: currentUserId)
+                    .execute()
+                
+                print("Current user membership: \(String(data: response.data, encoding: .utf8) ?? "No data")")
+                
+                if let jsonArray = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] {
+                    if jsonArray.isEmpty {
+                        print("  - Current user is NOT a member of this group!")
+                    } else {
+                        print("  - Current user IS a member")
+                    }
+                }
+            } catch {
+                print("Error: \(error)")
+            }
+        }
+        
+        print("\n=== DEBUG COMPLETE ===")
+    }
+
+    private func generateGroupCode() -> String {
+        let letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        return String((0..<6).map { _ in letters.randomElement()! })
+    }
+    
+    
+    // MARK: - Internal Structs for Decoding
+    private struct RawJoinRequest: Codable {
+        let id: String
+        let groupId: String
+        let userId: String
+        let status: String
+        let requestedAt: Date
+        let reviewedAt: Date?
+        let reviewedBy: String?
+        
+        enum CodingKeys: String, CodingKey {
+            case id
+            case groupId = "group_id"
+            case userId = "user_id"
+            case status
+            case requestedAt = "requested_at"
+            case reviewedAt = "reviewed_at"
+            case reviewedBy = "reviewed_by"
+        }
+    }
+}

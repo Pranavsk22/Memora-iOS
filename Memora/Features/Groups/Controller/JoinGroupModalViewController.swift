@@ -1,8 +1,10 @@
 import UIKit
+import Helpers
 
 // Add this protocol at the top
 protocol JoinGroupDelegate: AnyObject {
     func didJoinGroupSuccessfully()
+    func didSendJoinRequest()
 }
 
 class JoinGroupModalViewController: UIViewController {
@@ -63,11 +65,14 @@ class JoinGroupModalViewController: UIViewController {
             return
         }
         
-        joinGroup(with: code)
+        processJoinRequest(with: code)
     }
     
-    private func joinGroup(with code: String) {
-        let loadingAlert = UIAlertController(title: nil, message: "Joining group...", preferredStyle: .alert)
+    private func processJoinRequest(with code: String) {
+        let cleanCode = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        print("Looking for group with code: '\(cleanCode)'")
+        
+        let loadingAlert = UIAlertController(title: nil, message: "Finding group...", preferredStyle: .alert)
         let loadingIndicator = UIActivityIndicatorView(frame: CGRect(x: 10, y: 5, width: 50, height: 50))
         loadingIndicator.hidesWhenStopped = true
         loadingIndicator.style = .medium
@@ -77,33 +82,125 @@ class JoinGroupModalViewController: UIViewController {
         
         Task {
             do {
-                let group = try await StaticDataManager.shared.joinGroup(code: code)
+                // Use .execute() instead of .single() to handle the array response
+                let response = try await SupabaseManager.shared.client
+                    .from("groups")
+                    .select("*")
+                    .eq("code", value: cleanCode)
+                    .execute()
+                
+                let jsonString = String(data: response.data, encoding: .utf8) ?? "No data"
+                print("Response: \(jsonString)")
+                
+                // Parse the response as an array
+                let groups = try SupabaseManager.shared.jsonDecoder.decode([UserGroup].self, from: response.data)
+                
+                if groups.isEmpty {
+                    DispatchQueue.main.async {
+                        loadingAlert.dismiss(animated: true) {
+                            self.showAlert(title: "Not Found", message: "No group found with code '\(cleanCode)'")
+                        }
+                    }
+                    return
+                }
+                
+                let group = groups[0]
+                print("Found group: \(group.name) (ID: \(group.id))")
                 
                 DispatchQueue.main.async {
                     loadingAlert.dismiss(animated: true) {
-                        // Notify delegate
-                        self.delegate?.didJoinGroupSuccessfully()
-                        self.showSuccessAlert(group: group)
+                        self.checkMembershipAndSendRequest(group: group)
                     }
                 }
+                
             } catch {
+                print("Error finding group: \(error)")
                 DispatchQueue.main.async {
                     loadingAlert.dismiss(animated: true) {
-                        self.showAlert(title: "Error", message: "Invalid or expired group code")
+                        self.showAlert(title: "Error", message: "Could not find group: \(error.localizedDescription)")
                     }
                 }
             }
         }
     }
     
+    private func checkMembershipAndSendRequest(group: UserGroup) {
+        print(" DEBUG: Starting membership check for group: \(group.id)")
+        
+        let checkingAlert = UIAlertController(title: nil, message: "Checking status...", preferredStyle: .alert)
+        let loadingIndicator = UIActivityIndicatorView(frame: CGRect(x: 10, y: 5, width: 50, height: 50))
+        loadingIndicator.hidesWhenStopped = true
+        loadingIndicator.style = .medium
+        loadingIndicator.startAnimating()
+        checkingAlert.view.addSubview(loadingIndicator)
+        present(checkingAlert, animated: true)
+        
+        Task {
+            do {
+                print(" DEBUG: Step 1 - Checking if user is member...")
+                
+                // Check if already a member
+                let isMember = try await SupabaseManager.shared.checkIfUserIsMember(groupId: group.id)
+                print(" DEBUG: Is member? \(isMember)")
+                
+                if isMember {
+                    DispatchQueue.main.async {
+                        checkingAlert.dismiss(animated: true) {
+                            self.showAlert(title: "Already Member", message: "You are already a member of this group")
+                        }
+                    }
+                    return
+                }
+                
+                print(" DEBUG: Step 2 - Checking for existing requests...")
+                
+                // Check if already has pending request
+                let hasPendingRequest = try await SupabaseManager.shared.checkExistingJoinRequest(groupId: group.id)
+                print(" DEBUG: Has pending request? \(hasPendingRequest)")
+                
+                if hasPendingRequest {
+                    DispatchQueue.main.async {
+                        checkingAlert.dismiss(animated: true) {
+                            self.showAlert(title: "Request Pending", message: "You already have a pending request to join this group")
+                        }
+                    }
+                    return
+                }
+                
+                print(" DEBUG: Step 3 - Creating join request...")
+                
+                // Send join request
+                try await SupabaseManager.shared.createJoinRequest(groupId: group.id)
+                print(" DEBUG: Join request created successfully!")
+                
+                DispatchQueue.main.async {
+                    checkingAlert.dismiss(animated: true) {
+                        self.showSuccessAlert(group: group)
+                    }
+                }
+                
+            } catch {
+                print(" DEBUG: Error in checkMembershipAndSendRequest: \(error)")
+                print(" DEBUG: Error details: \(error.localizedDescription)")
+                
+                DispatchQueue.main.async {
+                    checkingAlert.dismiss(animated: true) {
+                        self.showAlert(title: "Error", message: "Could not process request: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+    }
+
     private func showSuccessAlert(group: UserGroup) {
         let alert = UIAlertController(
-            title: "Success!",
-            message: "You have joined '\(group.name)'",
+            title: "Request Sent!",
+            message: "Your request to join '\(group.name)' has been sent to the group admin for approval.",
             preferredStyle: .alert
         )
         
         alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            self.delegate?.didSendJoinRequest()
             self.dismissViewController()
         })
         

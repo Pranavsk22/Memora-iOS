@@ -62,17 +62,17 @@
                     </constraints>
                 </view>
                 <view hidden="YES" contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="emptyStateView">
-                    <rect key="frame" x="0.0" y="0.0" width="393" height="834"/>
+                    <rect key="frame" x="27" y="0.0" width="339" height="852"/>
                     <subviews>
                         <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="person.3" catalog="system" translatesAutoresizingMaskIntoConstraints="NO" id="emptyStateImage">
-                            <rect key="frame" x="146.66666666666666" y="318.33333333333331" width="100" height="98.333333333333371"/>
+                            <rect key="frame" x="119.66666666666666" y="327.33333333333331" width="100" height="98.333333333333371"/>
                             <constraints>
                                 <constraint firstAttribute="width" constant="100" id="k7t-vp-kSE"/>
                                 <constraint firstAttribute="height" constant="100" id="o1t-yV-MqR"/>
                             </constraints>
                         </imageView>
                         <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" textAlignment="center" lineBreakMode="tailTruncation" numberOfLines="0" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="emptyStateLabel">
-                            <rect key="frame" x="40" y="437" width="313" height="38.333333333333314"/>
+                            <rect key="frame" x="40" y="446" width="259" height="38.333333333333314"/>
                             <string key="text">No groups yet
 Create or join a group to get started</string>
                             <fontDescription key="fontDescription" type="system" pointSize="16"/>
@@ -94,6 +94,7 @@ Create or join a group to get started</string>
             <color key="backgroundColor" red="0.94901960784313721" green="0.94901960784313721" blue="0.96862745098039216" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
             <constraints>
                 <constraint firstItem="gLj-yN-oeG" firstAttribute="leading" secondItem="fnl-2z-Ty3" secondAttribute="leading" id="6NX-AK-kjl"/>
+                <constraint firstItem="emptyStateView" firstAttribute="top" secondItem="i5M-Pr-FkT" secondAttribute="top" id="DYO-hh-gp2"/>
                 <constraint firstItem="fnl-2z-Ty3" firstAttribute="trailing" secondItem="gLj-yN-oeG" secondAttribute="trailing" id="Qkv-Z7-Uq5"/>
                 <constraint firstItem="gLj-yN-oeG" firstAttribute="top" secondItem="fnl-2z-Ty3" secondAttribute="top" id="jCw-yE-nSl"/>
                 <constraint firstItem="emptyStateView" firstAttribute="centerX" secondItem="i5M-Pr-FkT" secondAttribute="centerX" id="n4N-Or-fyh"/>
@@ -110,7 +111,7 @@ Create or join a group to get started</string>
             <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
         </systemColor>
         <systemColor name="tertiaryLabelColor">
-            <color red="0.23529411759999999" green="0.23529411759999999" blue="0.26274509800000001" alpha="0.29803921570000003" colorSpace="custom" customColorSpace="sRGB"/>
+            <color red="0.23529411764705882" green="0.23529411764705882" blue="0.2627450980392157" alpha="0.29803921568627451" colorSpace="custom" customColorSpace="sRGB"/>
         </systemColor>
     </resources>
 </document>

@@ -150,15 +150,19 @@ class AuthViewController: UIViewController {
         present(loadingAlert, animated: true, completion: nil)
         
         Task {
-            let success = await authState.signUp(name: name, email: email, password: password)
-            
-            DispatchQueue.main.async {
-                loadingAlert.dismiss(animated: true) {
-                    if success {
+            do {
+                // Call SupabaseManager directly instead of through AuthState
+                try await SupabaseManager.shared.signUp(name: name, email: email, password: password)
+                
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
                         self.showSuccessAlert(name: name, email: email)
-                    } else {
-                        let errorMessage = self.authState.errorMessage ?? "Unable to create account"
-                        self.showAlert(title: "Sign Up Failed", message: errorMessage)
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        self.showAlert(title: "Sign Up Failed", message: error.localizedDescription)
                     }
                 }
             }

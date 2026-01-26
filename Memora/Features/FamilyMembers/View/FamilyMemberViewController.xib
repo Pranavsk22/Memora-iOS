@@ -70,7 +70,7 @@
                     </collectionViewFlowLayout>
                 </collectionView>
                 <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="Lzd-8e-PZR">
-                    <rect key="frame" x="317" y="113" width="60" height="60"/>
+                    <rect key="frame" x="318" y="113" width="60" height="60"/>
                     <constraints>
                         <constraint firstAttribute="width" constant="60" id="H1W-MV-Okh"/>
                         <constraint firstAttribute="height" constant="60" id="UAE-i9-jtG"/>
@@ -82,9 +82,9 @@
                     </connections>
                 </button>
                 <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="h7R-e8-uvZ">
-                    <rect key="frame" x="154" y="174.66666666666666" width="15" height="33"/>
+                    <rect key="frame" x="139" y="186" width="15" height="10"/>
                     <constraints>
-                        <constraint firstAttribute="height" constant="33" id="WWY-nF-Q93"/>
+                        <constraint firstAttribute="height" constant="10" id="WWY-nF-Q93"/>
                         <constraint firstAttribute="width" constant="15" id="dZP-Hc-zu1"/>
                     </constraints>
                     <state key="normal" title="Button"/>
@@ -100,7 +100,7 @@
             <color key="backgroundColor" red="0.94901960784313721" green="0.94901960784313721" blue="0.96862745098039216" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
             <constraints>
                 <constraint firstItem="Lzd-8e-PZR" firstAttribute="centerY" secondItem="y3O-Ol-Kxn" secondAttribute="centerY" id="40t-M5-LwH"/>
-                <constraint firstItem="h7R-e8-uvZ" firstAttribute="leading" secondItem="3JH-Lp-WDC" secondAttribute="trailing" id="63d-We-gcC"/>
+                <constraint firstItem="h7R-e8-uvZ" firstAttribute="leading" secondItem="3JH-Lp-WDC" secondAttribute="trailing" constant="-15" id="63d-We-gcC"/>
                 <constraint firstItem="fnl-2z-Ty3" firstAttribute="trailing" secondItem="3JH-Lp-WDC" secondAttribute="trailing" constant="239" id="6vd-tM-mn8"/>
                 <constraint firstItem="3JH-Lp-WDC" firstAttribute="top" secondItem="y3O-Ol-Kxn" secondAttribute="bottom" constant="8" id="8et-MQ-xjg"/>
                 <constraint firstItem="7aD-og-59U" firstAttribute="top" secondItem="hxh-97-eJ9" secondAttribute="bottom" constant="30" id="C6i-Zf-UWo"/>
@@ -110,11 +110,11 @@
                 <constraint firstItem="3JH-Lp-WDC" firstAttribute="leading" secondItem="fnl-2z-Ty3" secondAttribute="leading" id="SnF-OE-FbX"/>
                 <constraint firstItem="7aD-og-59U" firstAttribute="leading" secondItem="i5M-Pr-FkT" secondAttribute="leading" id="XBa-yH-9Ys"/>
                 <constraint firstItem="fnl-2z-Ty3" firstAttribute="trailing" secondItem="hxh-97-eJ9" secondAttribute="trailing" constant="15" id="Xg9-zQ-afW"/>
-                <constraint firstAttribute="trailing" secondItem="Lzd-8e-PZR" secondAttribute="trailing" constant="16" id="ZMt-La-174"/>
+                <constraint firstAttribute="trailing" secondItem="Lzd-8e-PZR" secondAttribute="trailing" constant="15" id="ZMt-La-174"/>
                 <constraint firstItem="h7R-e8-uvZ" firstAttribute="centerY" secondItem="3JH-Lp-WDC" secondAttribute="centerY" id="e7x-UF-8xW"/>
-                <constraint firstItem="y3O-Ol-Kxn" firstAttribute="leading" secondItem="i5M-Pr-FkT" secondAttribute="leadingMargin" id="eIA-vq-7Se"/>
                 <constraint firstItem="hxh-97-eJ9" firstAttribute="top" secondItem="3JH-Lp-WDC" secondAttribute="bottom" id="lWe-JR-ddp"/>
                 <constraint firstItem="y3O-Ol-Kxn" firstAttribute="top" secondItem="fnl-2z-Ty3" secondAttribute="top" id="vDX-NF-fRI"/>
+                <constraint firstItem="y3O-Ol-Kxn" firstAttribute="leading" secondItem="i5M-Pr-FkT" secondAttribute="leadingMargin" id="w6f-xl-aII"/>
             </constraints>
             <point key="canvasLocation" x="112.21374045801527" y="148.59154929577466"/>
         </view>

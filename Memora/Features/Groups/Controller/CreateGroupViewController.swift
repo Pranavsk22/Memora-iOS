@@ -77,7 +77,7 @@ class CreateGroupViewController: UIViewController {
             return
         }
         
-        print("🔍 CreateGroupVC: Starting group creation: \(groupName)")
+        print(" CreateGroupVC: Starting group creation: \(groupName)")
         
         // Disable button and show loading
         createButton.isEnabled = false
@@ -85,11 +85,11 @@ class CreateGroupViewController: UIViewController {
         
         Task {
             do {
-                print("🔍 CreateGroupVC: Calling SupabaseManager.createGroup...")
-                let group = try await StaticDataManager.shared.createGroup(name: groupName)
+                print(" CreateGroupVC: Calling SupabaseManager.createGroup...")
+                let group = try await SupabaseManager.shared.createGroup(name: groupName)
                 
                 DispatchQueue.main.async {
-                    print("✅ CreateGroupVC: Group created successfully: \(group.name)")
+                    print(" CreateGroupVC: Group created successfully: \(group.name)")
                     self.createButton.isEnabled = true
                     self.createButton.setTitle("Create Group", for: .normal)
                     
@@ -100,7 +100,7 @@ class CreateGroupViewController: UIViewController {
                 }
             } catch {
                 DispatchQueue.main.async {
-                    print("❌ CreateGroupVC: Error: \(error.localizedDescription)")
+                    print(" CreateGroupVC: Error: \(error.localizedDescription)")
                     self.createButton.isEnabled = true
                     self.createButton.setTitle("Create Group", for: .normal)
                     self.showAlert(title: "Error", message: error.localizedDescription)

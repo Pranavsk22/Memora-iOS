@@ -1,4 +1,5 @@
 import UIKit
+import Supabase
 
 class GroupsListViewController: UIViewController {
     
@@ -24,11 +25,11 @@ class GroupsListViewController: UIViewController {
         tableView.addGestureRecognizer(longPressGesture)
         
         print("\n🚀=== APP STARTED ===🚀")
-        print("👤 User ID: \(StaticDataManager.shared.getCurrentUserId() ?? "None")")
+        print("👤 User ID: \(SupabaseManager.shared.getCurrentUserId() ?? "None")")
         
         // Test connection
         Task {
-            let connected = await StaticDataManager.shared.testConnection()
+            let connected = await SupabaseManager.shared.testConnection()
             print("🌐 Supabase connection: \(connected ? "✅ Connected" : "❌ Failed")")
             
             // Load groups
@@ -52,7 +53,7 @@ class GroupsListViewController: UIViewController {
     }
 
     private func showGroupActions(for group: UserGroup, at indexPath: IndexPath) {
-        guard let currentUserId = StaticDataManager.shared.getCurrentUserId() else { return }
+        guard let currentUserId = SupabaseManager.shared.getCurrentUserId() else { return }
         
         let isAdmin = group.adminId == currentUserId
         
@@ -62,31 +63,36 @@ class GroupsListViewController: UIViewController {
             preferredStyle: .actionSheet
         )
         
+        // Copy Group Code option (available to everyone)
+        alert.addAction(UIAlertAction(title: "Copy Group Code", style: .default) { [weak self] _ in
+            UIPasteboard.general.string = group.code
+            self?.showAlert(title: "Copied", message: "Group code copied to clipboard")
+        })
+        
+        // View Members option (available to everyone)
+        alert.addAction(UIAlertAction(title: "View Members", style: .default) { [weak self] _ in
+            self?.viewGroupMembers(group: group)
+        })
+        
+        // Share Group Code option (available to everyone)
+        alert.addAction(UIAlertAction(title: "Share Group Code", style: .default) { [weak self] _ in
+            self?.shareGroupCode(group: group)
+        })
+        
         if isAdmin {
             // Admin options
             alert.addAction(UIAlertAction(title: "Delete Group", style: .destructive) { [weak self] _ in
                 self?.confirmDeleteGroup(group: group, at: indexPath)
             })
             
-            alert.addAction(UIAlertAction(title: "View Members", style: .default) { [weak self] _ in
-                self?.viewGroupMembers(group: group)
-            })
-            
-            alert.addAction(UIAlertAction(title: "Share Group Code", style: .default) { [weak self] _ in
-                self?.shareGroupCode(group: group)
+            // Admin leaving requires special handling
+            alert.addAction(UIAlertAction(title: "Leave Group", style: .destructive) { [weak self] _ in
+                self?.confirmAdminLeaveGroup(group: group, at: indexPath)
             })
         } else {
-            // Member options
+            // Member options - simple leave
             alert.addAction(UIAlertAction(title: "Leave Group", style: .destructive) { [weak self] _ in
                 self?.confirmLeaveGroup(group: group, at: indexPath)
-            })
-            
-            alert.addAction(UIAlertAction(title: "View Members", style: .default) { [weak self] _ in
-                self?.viewGroupMembers(group: group)
-            })
-            
-            alert.addAction(UIAlertAction(title: "Share Group Code", style: .default) { [weak self] _ in
-                self?.shareGroupCode(group: group)
             })
         }
         
@@ -99,6 +105,180 @@ class GroupsListViewController: UIViewController {
         }
         
         present(alert, animated: true)
+    }
+
+    private func confirmAdminLeaveGroup(group: UserGroup, at indexPath: IndexPath) {
+        // First, check if there are other admins
+        let loadingAlert = UIAlertController(title: nil, message: "Checking group members...", preferredStyle: .alert)
+        let loadingIndicator = UIActivityIndicatorView(frame: CGRect(x: 10, y: 5, width: 50, height: 50))
+        loadingIndicator.hidesWhenStopped = true
+        loadingIndicator.style = .medium
+        loadingIndicator.startAnimating()
+        loadingAlert.view.addSubview(loadingIndicator)
+        present(loadingAlert, animated: true)
+        
+        Task {
+            do {
+                let members = try await SupabaseManager.shared.getGroupMembers(groupId: group.id)
+                
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        // Filter out current user and find other admins
+                        guard let currentUserId = SupabaseManager.shared.getCurrentUserId() else { return }
+                        
+                        let otherAdmins = members.filter { member in
+                            member.isAdmin && member.id.lowercased() != currentUserId.lowercased()
+                        }
+                        
+                        if otherAdmins.isEmpty {
+                            // No other admins - must transfer admin or delete group
+                            self.showNoOtherAdminsAlert(group: group, at: indexPath, members: members)
+                        } else {
+                            // Other admins exist - show list to choose new admin
+                            self.showTransferAdminAlert(group: group, at: indexPath, otherAdmins: otherAdmins)
+                        }
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        self.showAlert(title: "Error", message: "Could not check group members: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+    }
+
+    private func showNoOtherAdminsAlert(group: UserGroup, at indexPath: IndexPath, members: [GroupMember]) {
+        guard let currentUserId = SupabaseManager.shared.getCurrentUserId() else { return }
+        
+        // Filter out current user
+        let otherMembers = members.filter { member in
+            member.id.lowercased() != currentUserId.lowercased()
+        }
+        
+        if otherMembers.isEmpty {
+            // No other members at all - just delete the group
+            let alert = UIAlertController(
+                title: "Cannot Leave Group",
+                message: "You are the only member in this group. You must delete the group instead.",
+                preferredStyle: .alert
+            )
+            
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            alert.addAction(UIAlertAction(title: "Delete Group", style: .destructive) { [weak self] _ in
+                self?.confirmDeleteGroup(group: group, at: indexPath)
+            })
+            
+            present(alert, animated: true)
+        } else {
+            // There are other members but no other admins
+            let alert = UIAlertController(
+                title: "Transfer Admin Role",
+                message: "You must transfer the admin role to another member before leaving. Choose a new admin:",
+                preferredStyle: .actionSheet
+            )
+            
+            for member in otherMembers {
+                alert.addAction(UIAlertAction(title: "\(member.name)", style: .default) { [weak self] _ in
+                    self?.transferAdminAndLeave(group: group, newAdmin: member, at: indexPath)
+                })
+            }
+            
+            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            
+            // For iPad
+            if let popoverController = alert.popoverPresentationController {
+                popoverController.sourceView = tableView
+                popoverController.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+            }
+            
+            present(alert, animated: true)
+        }
+    }
+
+    private func showTransferAdminAlert(group: UserGroup, at indexPath: IndexPath, otherAdmins: [GroupMember]) {
+        let alert = UIAlertController(
+            title: "Transfer Admin Role",
+            message: "Choose which admin should take over before you leave:",
+            preferredStyle: .actionSheet
+        )
+        
+        for admin in otherAdmins {
+            alert.addAction(UIAlertAction(title: "\(admin.name)", style: .default) { [weak self] _ in
+                self?.transferAdminAndLeave(group: group, newAdmin: admin, at: indexPath)
+            })
+        }
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        // For iPad
+        if let popoverController = alert.popoverPresentationController {
+            popoverController.sourceView = tableView
+            popoverController.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+        }
+        
+        present(alert, animated: true)
+    }
+
+    private func transferAdminAndLeave(group: UserGroup, newAdmin: GroupMember, at indexPath: IndexPath) {
+        let loadingAlert = UIAlertController(title: nil, message: "Transferring admin and leaving...", preferredStyle: .alert)
+        let loadingIndicator = UIActivityIndicatorView(frame: CGRect(x: 10, y: 5, width: 50, height: 50))
+        loadingIndicator.hidesWhenStopped = true
+        loadingIndicator.style = .medium
+        loadingIndicator.startAnimating()
+        loadingAlert.view.addSubview(loadingIndicator)
+        present(loadingAlert, animated: true)
+        
+        Task {
+            do {
+                // First, update the new admin status in group_members
+                try await SupabaseManager.shared.updateGroupAdmin(
+                    groupId: group.id,
+                    userId: newAdmin.id,
+                    isAdmin: true
+                )
+                
+                // Then, update the groups table to set new admin_id
+                try await client
+                    .from("groups")
+                    .update(["admin_id": newAdmin.id])
+                    .eq("id", value: group.id)
+                    .execute()
+                
+                // Finally, remove current user from group
+                guard let currentUserId = SupabaseManager.shared.getCurrentUserId() else { return }
+                try await SupabaseManager.shared.removeGroupMember(
+                    groupId: group.id,
+                    userId: currentUserId
+                )
+                
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        // Remove group from list
+                        self.groups.remove(at: indexPath.row)
+                        self.tableView.deleteRows(at: [indexPath], with: .automatic)
+                        self.emptyStateView.isHidden = !self.groups.isEmpty
+                        
+                        self.showAlert(
+                            title: "Success",
+                            message: "Admin role transferred to \(newAdmin.name) and you have left the group"
+                        )
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        self.showAlert(title: "Error", message: "Could not transfer admin and leave: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+    }
+
+    // Add client property to GroupsListViewController
+    private var client: SupabaseClient {
+        return SupabaseManager.shared.client
     }
 
     private func shareGroupCode(group: UserGroup) {
@@ -125,7 +305,7 @@ class GroupsListViewController: UIViewController {
         
         Task {
             do {
-                let members = try await StaticDataManager.shared.getGroupMembers(groupId: group.id)
+                let members = try await SupabaseManager.shared.getGroupMembers(groupId: group.id)
                 
                 DispatchQueue.main.async {
                     loadingAlert.dismiss(animated: true) {
@@ -185,7 +365,7 @@ class GroupsListViewController: UIViewController {
         
         Task {
             do {
-                try await StaticDataManager.shared.deleteGroup(groupId: group.id)
+                try await SupabaseManager.shared.deleteGroup(groupId: group.id)
                 
                 DispatchQueue.main.async {
                     loadingAlert.dismiss(animated: true) {
@@ -221,7 +401,7 @@ class GroupsListViewController: UIViewController {
     }
 
     private func leaveGroup(group: UserGroup, at indexPath: IndexPath) {
-        guard let userId = StaticDataManager.shared.getCurrentUserId() else { return }
+        guard let userId = SupabaseManager.shared.getCurrentUserId() else { return }
         
         let loadingAlert = UIAlertController(title: nil, message: "Leaving group...", preferredStyle: .alert)
         let loadingIndicator = UIActivityIndicatorView(frame: CGRect(x: 10, y: 5, width: 50, height: 50))
@@ -233,7 +413,7 @@ class GroupsListViewController: UIViewController {
         
         Task {
             do {
-                try await StaticDataManager.shared.removeGroupMember(groupId: group.id, userId: userId)
+                try await SupabaseManager.shared.removeGroupMember(groupId: group.id, userId: userId)
                 
                 DispatchQueue.main.async {
                     loadingAlert.dismiss(animated: true) {
@@ -327,7 +507,7 @@ class GroupsListViewController: UIViewController {
         
         Task {
             do {
-                let fetchedGroups = try await StaticDataManager.shared.getMyGroups()
+                let fetchedGroups = try await SupabaseManager.shared.getMyGroups()
                 print("📱 Successfully loaded \(fetchedGroups.count) groups")
                 
                 DispatchQueue.main.async {
@@ -353,7 +533,7 @@ class GroupsListViewController: UIViewController {
                     self.refreshControl.endRefreshing()
                     
                     // Even on error, show demo groups
-                    let demoGroups = StaticDataManager.shared.getDemoGroups()
+                    let demoGroups = SupabaseManager.shared.getDemoGroups()
                     self.groups = demoGroups
                     self.tableView.reloadData()
                     self.emptyStateView.isHidden = true
@@ -419,13 +599,13 @@ extension GroupsListViewController: UITableViewDataSource, UITableViewDelegate {
         let group = groups[indexPath.row]
         
         // Check if current user is admin
-        let isAdmin = group.adminId == StaticDataManager.shared.getCurrentUserId()
+        let isAdmin = group.adminId == SupabaseManager.shared.getCurrentUserId()
         
         // Configure cell with admin badge if user is admin
         cell.configure(
             title: group.name,
             subtitle: "Code: \(group.code)",
-            image: UIImage(named: "group_family"), // Use appropriate image
+//            image: UIImage(named: "group_family"), // Use appropriate image
             isAdmin: isAdmin
         )
         
@@ -440,18 +620,16 @@ extension GroupsListViewController: UITableViewDataSource, UITableViewDelegate {
         
         // Navigate to FamilyMemberViewController
         let familyVC = FamilyMemberViewController(nibName: "FamilyMemberViewController", bundle: nil)
-        
-        // You might want to pass the group data
-        // familyVC.group = group
-        
+        familyVC.group = group // Pass the group
         navigationController?.pushViewController(familyVC, animated: true)
     }
+    
     
     func tableView(_ tableView: UITableView, trailingSwipeActionsConfigurationForRowAt indexPath: IndexPath) -> UISwipeActionsConfiguration? {
         let group = groups[indexPath.row]
         
         // Only allow admin to delete group
-        if group.adminId == StaticDataManager.shared.getCurrentUserId() {
+        if group.adminId == SupabaseManager.shared.getCurrentUserId() {
             let deleteAction = UIContextualAction(style: .destructive, title: "Delete") { [weak self] _, _, completion in
                 self?.confirmDeleteGroup(group: group, at: indexPath)
                 completion(true)
@@ -592,10 +770,15 @@ extension GroupsListViewController: CreateGroupDelegate {
 extension GroupsListViewController: JoinGroupDelegate {
     func didJoinGroupSuccessfully() {
         print("Group joined successfully, refreshing list...")
-        // Refresh after a short delay to ensure data is saved
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.loadGroups()
         }
+    }
+    
+    func didSendJoinRequest() {
+        print("Join request sent successfully, showing confirmation...")
+        // You might want to show a confirmation alert
+        showAlert(title: "Request Sent", message: "Your join request has been sent to the group admin for approval.")
     }
 }
 

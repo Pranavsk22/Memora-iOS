@@ -10,7 +10,7 @@ import UIKit
 class GroupsTableViewCell: UITableViewCell {
     
     @IBOutlet weak var containerView: UIView!
-    @IBOutlet weak var groupImageView: UIImageView!
+    //@IBOutlet weak var groupImageView: UIImageView!
     @IBOutlet weak var titleLabel: UILabel!
     @IBOutlet weak var subtitleLabel: UILabel!
     @IBOutlet weak var adminBadge: UIView!
@@ -25,8 +25,8 @@ class GroupsTableViewCell: UITableViewCell {
         containerView.layer.cornerRadius = 22
         containerView.backgroundColor = .white
         
-        groupImageView.layer.cornerRadius = 24
-        groupImageView.clipsToBounds = true
+//        groupImageView.layer.cornerRadius = 24
+//        groupImageView.clipsToBounds = true
         
         // Admin badge styling
         adminBadge.layer.cornerRadius = 8
@@ -36,10 +36,10 @@ class GroupsTableViewCell: UITableViewCell {
         adminBadge.isHidden = true
     }
     
-    func configure(title: String, subtitle: String, image: UIImage?, isAdmin: Bool = false) {
+    func configure(title: String, subtitle: String, isAdmin: Bool = false) {
         titleLabel.text = title
         subtitleLabel.text = subtitle
-        groupImageView.image = image
+        //groupImageView.image = image
         
         // Show admin badge if user is admin
         adminBadge.isHidden = !isAdmin

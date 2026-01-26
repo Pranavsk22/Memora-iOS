@@ -106,8 +106,8 @@ extension GroupMembersManagementViewController: UITableViewDataSource, UITableVi
         let member = members[indexPath.row]
         
         // Check if current user is admin and can manage
-        let isCurrentUserAdmin = group.adminId == StaticDataManager.shared.getCurrentUserId()
-        let isCurrentUser = member.id == StaticDataManager.shared.getCurrentUserId()
+        let isCurrentUserAdmin = group.adminId == SupabaseManager.shared.getCurrentUserId()
+        let isCurrentUser = member.id == SupabaseManager.shared.getCurrentUserId()
         
         cell.configure(
             member: member,
@@ -152,7 +152,7 @@ extension GroupMembersManagementViewController: UITableViewDataSource, UITableVi
     private func removeMember(member: GroupMember, at indexPath: IndexPath) {
         Task {
             do {
-                try await StaticDataManager.shared.removeGroupMember(groupId: group.id, userId: member.id)
+                try await SupabaseManager.shared.removeGroupMember(groupId: group.id, userId: member.id)
                 
                 DispatchQueue.main.async {
                     self.members.remove(at: indexPath.row)
@@ -184,7 +184,7 @@ extension GroupMembersManagementViewController: UITableViewDataSource, UITableVi
     private func makeAdmin(member: GroupMember) {
         Task {
             do {
-                try await StaticDataManager.shared.updateGroupAdmin(groupId: group.id, userId: member.id, isAdmin: true)
+                try await SupabaseManager.shared.updateGroupAdmin(groupId: group.id, userId: member.id, isAdmin: true)
                 
                 DispatchQueue.main.async {
                     // Update local data

@@ -10,19 +10,9 @@ import UIKit
 class FamilyRequestsViewController: UIViewController {
 
     private let tableView = UITableView()
+    var group: UserGroup?
+    var requests: [JoinRequest] = []
     
-    // Mock Request Model
-    struct Request {
-        let name: String
-        let email: String
-    }
-    
-    // Dummy list (replace later with API data)
-    var requests: [Request] = [
-        Request(name: "John Doe", email: "john@gmail.com"),
-        Request(name: "Priya Singh", email: "priya@gmail.com"),
-        Request(name: "Karan Mehta", email: "karan@gmail.com")
-    ]
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -32,8 +22,46 @@ class FamilyRequestsViewController: UIViewController {
         self.title = "Join Requests"
         
         setupTableView()
+        loadRequests()
     }
     
+    private func loadRequests() {
+        guard let group = group else {
+            print("No group provided to FamilyRequestsViewController")
+            return
+        }
+        
+        print("Loading requests for group: \(group.name) (\(group.id))")
+        
+        let loadingAlert = UIAlertController(title: nil, message: "Loading requests...", preferredStyle: .alert)
+        let loadingIndicator = UIActivityIndicatorView(frame: CGRect(x: 10, y: 5, width: 50, height: 50))
+        loadingIndicator.hidesWhenStopped = true
+        loadingIndicator.style = .medium
+        loadingIndicator.startAnimating()
+        loadingAlert.view.addSubview(loadingIndicator)
+        present(loadingAlert, animated: true)
+        
+        Task {
+            do {
+                requests = try await SupabaseManager.shared.getPendingJoinRequests(groupId: group.id)
+                print("Loaded \(requests.count) requests in FamilyRequestsViewController")
+                
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true)
+                    self.tableView.reloadData()
+                    print("Table reloaded with \(self.requests.count) requests")
+                }
+            } catch {
+                print("Error loading requests in FamilyRequestsViewController: \(error)")
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true)
+                    self.showAlert(title: "Error", message: "Could not load requests: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+
     private func setupTableView() {
         view.addSubview(tableView)
         tableView.translatesAutoresizingMaskIntoConstraints = false
@@ -72,6 +100,13 @@ class FamilyRequestsViewController: UIViewController {
         
         return header
     }
+    
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+    
 }
 
 extension FamilyRequestsViewController: UITableViewDelegate, UITableViewDataSource {
@@ -88,12 +123,12 @@ extension FamilyRequestsViewController: UITableViewDelegate, UITableViewDataSour
 
         let request = requests[indexPath.row]
         
-        cell.nameLabel.text = request.name
-        cell.emailLabel.text = request.email
+        cell.nameLabel.text = request.userName ?? "Unknown User"
+        cell.emailLabel.text = request.userEmail ?? "No email"
         
         //  APPROVE confirmation
         cell.approveAction = { [weak self] in
-            guard let self = self else { return }
+            guard let self = self, let group = self.group else { return }
             
             let alert = UIAlertController(
                 title: "Confirm Approval",
@@ -103,11 +138,8 @@ extension FamilyRequestsViewController: UITableViewDelegate, UITableViewDataSour
             
             alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
             alert.addAction(UIAlertAction(title: "Approve", style: .default, handler: { _ in
-                self.requests.remove(at: indexPath.row)
+                self.approveRequest(request: request, at: indexPath)
                 
-                tableView.performBatchUpdates({
-                    tableView.deleteRows(at: [indexPath], with: .automatic)
-                }, completion: nil)
             }))
             
             self.present(alert, animated: true)
@@ -125,16 +157,81 @@ extension FamilyRequestsViewController: UITableViewDelegate, UITableViewDataSour
             
             alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
             alert.addAction(UIAlertAction(title: "Reject", style: .destructive, handler: { _ in
-                self.requests.remove(at: indexPath.row)
+                self.rejectRequest(request: request, at: indexPath)
                 
-                tableView.performBatchUpdates({
-                    tableView.deleteRows(at: [indexPath], with: .automatic)
-                }, completion: nil)
             }))
             
             self.present(alert, animated: true)
         }
         
         return cell
+    }
+    
+    
+    private func approveRequest(request: JoinRequest, at indexPath: IndexPath) {
+        guard let group = group else { return }
+        
+        let loadingAlert = UIAlertController(title: nil, message: "Approving...", preferredStyle: .alert)
+        let loadingIndicator = UIActivityIndicatorView(frame: CGRect(x: 10, y: 5, width: 50, height: 50))
+        loadingIndicator.hidesWhenStopped = true
+        loadingIndicator.style = .medium
+        loadingIndicator.startAnimating()
+        loadingAlert.view.addSubview(loadingIndicator)
+        present(loadingAlert, animated: true)
+        
+        Task {
+            do {
+                try await SupabaseManager.shared.approveJoinRequest(
+                    requestId: request.id,
+                    groupId: group.id,
+                    userId: request.userId
+                )
+                
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        self.requests.remove(at: indexPath.row)
+                        self.tableView.deleteRows(at: [indexPath], with: .automatic)
+                        self.showAlert(title: "Success", message: "Request approved successfully")
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        self.showAlert(title: "Error", message: "Could not approve request: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
+    }
+    
+    
+    private func rejectRequest(request: JoinRequest, at indexPath: IndexPath) {
+        let loadingAlert = UIAlertController(title: nil, message: "Rejecting...", preferredStyle: .alert)
+        let loadingIndicator = UIActivityIndicatorView(frame: CGRect(x: 10, y: 5, width: 50, height: 50))
+        loadingIndicator.hidesWhenStopped = true
+        loadingIndicator.style = .medium
+        loadingIndicator.startAnimating()
+        loadingAlert.view.addSubview(loadingIndicator)
+        present(loadingAlert, animated: true)
+        
+        Task {
+            do {
+                try await SupabaseManager.shared.rejectJoinRequest(requestId: request.id)
+                
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        self.requests.remove(at: indexPath.row)
+                        self.tableView.deleteRows(at: [indexPath], with: .automatic)
+                        self.showAlert(title: "Success", message: "Request rejected")
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        self.showAlert(title: "Error", message: "Could not reject request: \(error.localizedDescription)")
+                    }
+                }
+            }
+        }
     }
 }
