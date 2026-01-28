@@ -93,32 +93,43 @@ class SupabaseManager {
         print("Signing up user: \(email)")
         
         do {
-            // 1. Create auth user
+            // 1. Create auth user WITHOUT auto-signin
             let authResponse = try await client.auth.signUp(
                 email: email,
                 password: password
             )
             
-            // Get the user directly - it's not optional in newer Supabase SDK versions
             let user = authResponse.user
             let newUserId = user.id.uuidString
             
             print("Auth user created with ID: \(newUserId)")
             
-            // 2. Sign in to establish session
-            try await client.auth.signIn(email: email, password: password)
+            // IMPORTANT: DO NOT try to sign in here
+            // The user needs to verify their email first
             
-            // Update current user
-            let session = try await client.auth.session
-            self.currentUser = session.user
+            // 2. Update current user (will be nil since not signed in)
+            self.currentUser = nil // Not signed in yet
             
-            // 3. Create profile WITH THE AUTH USER'S ID
+            // 3. Create profile with upsert in case user already exists
             try await createUserProfile(userId: newUserId, name: name, email: email)
             
             print("Sign up completed successfully for user: \(newUserId)")
             
+            // Note: User is NOT signed in - they need to verify email first
+            
         } catch {
             print("Sign up error: \(error)")
+            
+            // If it's a duplicate user error, that's okay
+            let errorMessage = error.localizedDescription.lowercased()
+            if errorMessage.contains("user already registered") ||
+               errorMessage.contains("already exists") {
+                print("User already exists - they should verify their email")
+                // Don't throw here - treat this as "success" for UX purposes
+                // The user will need to verify email and then sign in
+                return
+            }
+            
             throw error
         }
     }
@@ -145,6 +156,13 @@ class SupabaseManager {
             print("Sign out error: \(error)")
             throw error
         }
+    }
+    
+    func resendVerificationEmail(email: String) async throws {
+        let authResponse = try await client.auth.resend(email: email, type: .signup)
+        
+        // You might want to handle the response if needed
+        print("Verification email resent: \(authResponse)")
     }
     
     // MARK: - Profile Management
@@ -374,59 +392,65 @@ class SupabaseManager {
             let jsonString = String(data: response.data, encoding: .utf8) ?? "No data"
             print(" DEBUG createGroup: Response data: \(jsonString)")
             
-            // Try manual decoding first
-            do {
-                let groups = try jsonDecoder.decode([UserGroup].self, from: response.data)
-                
-                guard let group = groups.first else {
-                    print(" DEBUG createGroup: No group returned from function")
-                    throw NSError(domain: "No group created", code: 500)
-                }
-                
-                print(" DEBUG createGroup: Group created: \(group.name), ID: \(group.id), Code: \(group.code)")
-                return group
-                
-            } catch {
-                print(" DEBUG createGroup: Standard decoding failed, trying manual...")
-                
-                // Manual decoding as fallback
-                guard let jsonObject = try JSONSerialization.jsonObject(with: response.data) as? [[String: Any]],
-                      let firstGroup = jsonObject.first,
-                      let id = firstGroup["id"] as? String,
-                      let name = firstGroup["name"] as? String,
-                      let code = firstGroup["code"] as? String,
-                      let createdBy = firstGroup["created_by"] as? String,
-                      let adminId = firstGroup["admin_id"] as? String,
-                      let createdAtString = firstGroup["created_at"] as? String else {
-                    throw NSError(domain: "Failed to parse response", code: 500)
-                }
-                
-                // Parse date
-                let formatter = ISO8601DateFormatter()
-                formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-                guard let createdAt = formatter.date(from: createdAtString) else {
-                    throw NSError(domain: "Failed to parse date", code: 500)
-                }
-                
-                let group = UserGroup(
-                    id: id,
-                    name: name,
-                    code: code,
-                    createdBy: createdBy,
-                    adminId: adminId,
-                    createdAt: createdAt
-                )
-                
-                print(" DEBUG createGroup: Manually decoded group: \(group.name)")
-                return group
+            // Parse the group
+            let groups = try jsonDecoder.decode([UserGroup].self, from: response.data)
+            
+            guard let group = groups.first else {
+                print(" DEBUG createGroup: No group returned from function")
+                throw NSError(domain: "No group created", code: 500)
             }
+            
+            print(" DEBUG createGroup: Group created: \(group.name), ID: \(group.id), Code: \(group.code)")
+            
+            // MANUAL FIX: Also add creator to group_members table
+            print(" DEBUG createGroup: Manually adding creator to group_members...")
+            do {
+                try await addGroupMember(groupId: group.id, userId: userId, isAdmin: true)
+                print(" DEBUG createGroup: Successfully added creator to group_members")
+            } catch {
+                print(" DEBUG createGroup: Warning: Could not add creator to group_members: \(error)")
+                // Continue anyway - at least the group was created
+            }
+            
+            return group
             
         } catch {
             print(" DEBUG createGroup: Error: \(error)")
             print(" DEBUG createGroup: Error localized: \(error.localizedDescription)")
             
-            throw error
+            // Try alternative approach
+            print(" DEBUG createGroup: Trying alternative approach...")
+            return try await createGroupAlternative(name: name)
         }
+    }
+
+    // Alternative create group function
+    func createGroupAlternative(name: String) async throws -> UserGroup {
+        guard let userId = getCurrentUserId() else {
+            throw NSError(domain: "No user logged in", code: 401)
+        }
+        
+        let code = generateGroupCode()
+        
+        // Step 1: Create the group
+        let groupResponse = try await client
+            .from("groups")
+            .insert([
+                "name": name,
+                "code": code,
+                "created_by": userId,
+                "admin_id": userId
+            ])
+            .select()
+            .single()
+            .execute()
+        
+        let group = try jsonDecoder.decode(UserGroup.self, from: groupResponse.data)
+        
+        // Step 2: Add creator as admin member
+        try await addGroupMember(groupId: group.id, userId: userId, isAdmin: true)
+        
+        return group
     }
 
     func joinGroup(code: String) async throws -> UserGroup {
@@ -1708,6 +1732,7 @@ class SupabaseManager {
         
         print("\n=== DEBUG COMPLETE ===")
     }
+    
 
     private func generateGroupCode() -> String {
         let letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
