@@ -1,0 +1,21 @@
+# Xcode
+.DS_Store
+*.swp
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/xcshareddata/xcschemes/
+*.xcodeproj/xcuserdata/
+*.xcworkspace/contents.xcworkspacedata
+*.xcworkspace/xcuserdata/
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+
+# Swift Package Manager
+.swiftpm
+Package.resolved
+
+# Environment files
+GoogleService-Info.plist
