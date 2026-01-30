@@ -882,6 +882,7 @@ class SupabaseManager {
     }
     
     
+    
     // MARK: - Join Requests
     func createJoinRequest(groupId: String) async throws {
         guard let userId = getCurrentUserId() else {
@@ -1234,11 +1235,21 @@ class SupabaseManager {
     func getGroupMemories(groupId: String) async throws -> [GroupMemory] {
         do {
             let response = try await client
-                .from("group_memories") // Or your actual table name
+                .from("group_memories")
                 .select("""
-                    id, user_id, group_id, title, content, 
-                    media_url, media_type, year, category, 
-                    created_at, profiles!inner(name)
+                    id,
+                    created_at,
+                    memories!inner(
+                        id,
+                        title,
+                        content,
+                        media_url,
+                        media_type,
+                        year,
+                        category,
+                        created_at,
+                        profiles!inner(name)
+                    )
                 """)
                 .eq("group_id", value: groupId)
                 .order("created_at", ascending: false)
@@ -1258,26 +1269,31 @@ class SupabaseManager {
             
             for item in jsonArray {
                 guard let id = item["id"] as? String,
-                      let userId = item["user_id"] as? String,
-                      let groupId = item["group_id"] as? String,
-                      let title = item["title"] as? String,
                       let createdAtString = item["created_at"] as? String,
-                      let profilesDict = item["profiles"] as? [String: Any],
+                      let memoriesDict = item["memories"] as? [String: Any],
+                      let memoryId = memoriesDict["id"] as? String,
+                      let title = memoriesDict["title"] as? String,
+                      let memoryCreatedAtString = memoriesDict["created_at"] as? String,
+                      let profilesDict = memoriesDict["profiles"] as? [String: Any],
                       let userName = profilesDict["name"] as? String else {
                     print("Skipping invalid memory data")
                     continue
                 }
                 
-                let content = item["content"] as? String
-                let mediaUrl = item["media_url"] as? String
-                let mediaType = item["media_type"] as? String
-                let year = item["year"] as? Int
-                let category = item["category"] as? String
-                let createdAt = dateFormatter.date(from: createdAtString) ?? Date()
+                let content = memoriesDict["content"] as? String
+                let mediaUrl = memoriesDict["media_url"] as? String
+                let mediaType = memoriesDict["media_type"] as? String
+                let year = memoriesDict["year"] as? Int
+                let category = memoriesDict["category"] as? String
                 
+                let createdAt = dateFormatter.date(from: createdAtString) ?? Date()
+                let memoryCreatedAt = dateFormatter.date(from: memoryCreatedAtString) ?? Date()
+                
+                // Note: We need to decide which userId to use - from group_memories or from memories?
+                // For now, we'll need to adjust the GroupMemory struct
                 let memory = GroupMemory(
-                    id: id,
-                    userId: userId,
+                    id: memoryId,  // Use the actual memory ID
+                    userId: "",    // We'll need to get this from memories table
                     groupId: groupId,
                     title: title,
                     content: content,
@@ -1285,13 +1301,13 @@ class SupabaseManager {
                     mediaType: mediaType,
                     year: year,
                     category: category,
-                    createdAt: createdAt,
+                    createdAt: memoryCreatedAt,  // Use the memory creation date
                     userName: userName
                 )
                 memories.append(memory)
             }
             
-            print("Successfully parsed \(memories.count) memories")
+            print("Successfully parsed \(memories.count) group memories")
             return memories
             
         } catch {

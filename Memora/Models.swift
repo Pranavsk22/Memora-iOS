@@ -126,7 +126,7 @@ struct GroupMember: Codable, Identifiable {
 
 struct GroupMemory: Codable, Identifiable {
     let id: String
-    let userId: String
+    let userId: String?  // Make optional
     let groupId: String
     let title: String
     let content: String?

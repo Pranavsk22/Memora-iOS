@@ -1,4 +1,3 @@
-
 //
 //  FamilyMemberViewController.swift
 //  Memora
@@ -11,77 +10,94 @@ import UIKit
 class FamilyMemberViewController: UIViewController {
     
     var group: UserGroup?
-
-    // MARK: - IBOutlets
+    
+    // MARK: - Data Properties
+    private var members: [GroupMember] = []
+    private var memories: [GroupMemory] = []
+    private var isLoading = false
+    private var errorMessage: String?
+    
+    // MARK: - UI Components
     @IBOutlet weak var membersCollectionView: UICollectionView!
     @IBOutlet weak var postsCollectionView: UICollectionView!
     @IBOutlet weak var profileButton: UIButton!
-
-    // MARK: - Dummy Data
-    let members: [(name: String, imageName: String)] = [
-        ("John", "Window"),
-        ("Peter", "Window-1"),
-        ("Raqual", "Window-2")
-    ]
-
-    let posts: [(prompt: String, author: String, imageName: String)] = [
-        ("Birthday Celebration", "Mom", "Window-1"),
-        ("Trip to Goa", "Dad", "Window-2"),
-        ("Graduation Day", "Peter", "Window")
-    ]
+    @IBOutlet weak var groupNameLabel: UILabel!
+    @IBOutlet weak var membersLoadingIndicator: UIActivityIndicatorView!
+    @IBOutlet weak var memoriesLoadingIndicator: UIActivityIndicatorView!
+    @IBOutlet weak var membersEmptyLabel: UILabel!
+    @IBOutlet weak var memoriesEmptyLabel: UILabel!
     
-    // MARK: - Layout
+    // MARK: - View Lifecycle
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        
+        setupUI()
+        setupCollections()
+        
+        // Load data if we have a group
+        if let group = group {
+            loadGroupData()
+        } else {
+            showError(message: "No group information available")
+        }
+    }
+    
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-
+        
         // Profile button circular styling
         let radius = min(profileButton.bounds.width, profileButton.bounds.height) / 2
         profileButton.layer.cornerRadius = radius
         profileButton.clipsToBounds = true
-
         profileButton.imageView?.contentMode = .scaleAspectFill
         profileButton.contentHorizontalAlignment = .fill
         profileButton.contentVerticalAlignment = .fill
-
         profileButton.layer.borderWidth = 1
         profileButton.layer.borderColor = UIColor.black.withAlphaComponent(0.12).cgColor
     }
-
-    // MARK: - View Lifecycle
-    override func viewDidLoad() {
-        super.viewDidLoad()
-
-        // Background (unchanged color scheme)
+    
+    // MARK: - Setup
+    private func setupUI() {
         view.backgroundColor = UIColor(
             red: 242/255,
             green: 242/255,
             blue: 247/255,
             alpha: 1
         )
-
-        setupMembersCollection()
-        setupPostsCollection()
+        
+        // Set group name if available
+        groupNameLabel.text = group?.name ?? "My Family"
+        
+        // Configure loading indicators
+        membersLoadingIndicator.hidesWhenStopped = true
+        memoriesLoadingIndicator.hidesWhenStopped = true
+        
+        // Configure empty state labels
+        membersEmptyLabel.isHidden = true
+        membersEmptyLabel.text = "No members in this group"
+        membersEmptyLabel.textColor = .systemGray
+        
+        memoriesEmptyLabel.isHidden = true
+        memoriesEmptyLabel.text = "No memories shared in this group"
+        memoriesEmptyLabel.textColor = .systemGray
     }
-  
-    // MARK: - Members Collection Setup
-    private func setupMembersCollection() {
-        let nib = UINib(
+    
+    private func setupCollections() {
+        // Members Collection
+        let memberNib = UINib(
             nibName: "FamilyMemberCollectionViewCell",
             bundle: nil
         )
         membersCollectionView.register(
-            nib,
+            memberNib,
             forCellWithReuseIdentifier: "FamilyMemberCell"
         )
-
         membersCollectionView.delegate = self
         membersCollectionView.dataSource = self
         membersCollectionView.backgroundColor = .clear
-
+        
         if let layout = membersCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
             layout.scrollDirection = .horizontal
-
-            // 🔧 CHANGED: Better spacing for rounded cards
             layout.itemSize = CGSize(width: 150, height: 190)
             layout.minimumLineSpacing = 16
             layout.sectionInset = UIEdgeInsets(
@@ -91,24 +107,21 @@ class FamilyMemberViewController: UIViewController {
                 right: 16
             )
         }
-    }
-
-    // MARK: - Posts Collection Setup
-    private func setupPostsCollection() {
-        let nib = UINib(
+        
+        // Posts Collection
+        let memoryNib = UINib(
             nibName: "FamilyMemoriesCollectionViewCell",
             bundle: nil
         )
         postsCollectionView.register(
-            nib,
+            memoryNib,
             forCellWithReuseIdentifier: "FamilyMemoriesCell"
         )
-
         postsCollectionView.delegate = self
         postsCollectionView.dataSource = self
         postsCollectionView.backgroundColor = .clear
         postsCollectionView.showsVerticalScrollIndicator = false
-
+        
         if let layout = postsCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
             layout.scrollDirection = .vertical
             layout.minimumLineSpacing = 35
@@ -124,7 +137,112 @@ class FamilyMemberViewController: UIViewController {
             )
         }
     }
-
+    
+    // MARK: - Data Loading
+    private func loadGroupData() {
+        guard !isLoading else { return }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        // Show loading states
+        membersLoadingIndicator.startAnimating()
+        memoriesLoadingIndicator.startAnimating()
+        membersEmptyLabel.isHidden = true
+        memoriesEmptyLabel.isHidden = true
+        
+        // Load members and memories in parallel
+        Task {
+            await withTaskGroup(of: Void.self) { taskGroup in
+                taskGroup.addTask { [weak self] in
+                    await self?.loadMembers()
+                }
+                
+                taskGroup.addTask { [weak self] in
+                    await self?.loadMemories()
+                }
+            }
+            
+            DispatchQueue.main.async {
+                self.isLoading = false
+                self.updateUI()
+            }
+        }
+    }
+    
+    private func loadMembers() async {
+        guard let group = group else { return }
+        
+        do {
+            let fetchedMembers = try await SupabaseManager.shared.getGroupMembers(groupId: group.id)
+            
+            DispatchQueue.main.async {
+                self.members = fetchedMembers
+                self.membersCollectionView.reloadData()
+                self.membersLoadingIndicator.stopAnimating()
+                self.membersEmptyLabel.isHidden = !self.members.isEmpty
+            }
+        } catch {
+            print("Error loading members: \(error)")
+            DispatchQueue.main.async {
+                self.membersLoadingIndicator.stopAnimating()
+                self.membersEmptyLabel.isHidden = false
+                self.membersEmptyLabel.text = "Error loading members"
+            }
+        }
+    }
+    
+    private func loadMemories() async {
+        guard let group = group else { return }
+        
+        do {
+            let fetchedMemories = try await SupabaseManager.shared.getGroupMemories(groupId: group.id)
+            
+            DispatchQueue.main.async {
+                self.memories = fetchedMemories
+                self.postsCollectionView.reloadData()
+                self.memoriesLoadingIndicator.stopAnimating()
+                self.memoriesEmptyLabel.isHidden = !self.memories.isEmpty
+            }
+        } catch {
+            print("Error loading memories: \(error)")
+            DispatchQueue.main.async {
+                self.memoriesLoadingIndicator.stopAnimating()
+                self.memoriesEmptyLabel.isHidden = false
+                self.memoriesEmptyLabel.text = "Error loading memories"
+            }
+        }
+    }
+    
+    private func updateUI() {
+        // Update empty states
+        membersEmptyLabel.isHidden = !members.isEmpty
+        memoriesEmptyLabel.isHidden = !memories.isEmpty
+        
+        // Reload collection views
+        membersCollectionView.reloadData()
+        postsCollectionView.reloadData()
+    }
+    
+    private func showError(message: String) {
+        errorMessage = message
+        
+        let alert = UIAlertController(
+            title: "Error",
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            self.navigationController?.popViewController(animated: true)
+        })
+        present(alert, animated: true)
+    }
+    
+    // MARK: - Refresh
+    @objc private func refreshData() {
+        loadGroupData()
+    }
+    
     // MARK: - Navigation actions
     @IBAction func FamilyMemberPressed(_ sender: UIButton) {
         let familyList = FamilyMemberListViewController(
@@ -151,68 +269,106 @@ class FamilyMemberViewController: UIViewController {
             sheet.detents = [.large()]
             sheet.selectedDetentIdentifier = .large
         }
-
+        
         present(nav, animated: true)
     }
 }
 
 // MARK: - CollectionView DataSource & Delegate
 extension FamilyMemberViewController: UICollectionViewDataSource, UICollectionViewDelegate {
-
+    
     func numberOfSections(in collectionView: UICollectionView) -> Int {
         return 1
     }
-
+    
     func collectionView(
         _ collectionView: UICollectionView,
         numberOfItemsInSection section: Int
     ) -> Int {
         return collectionView == membersCollectionView
             ? members.count
-            : posts.count
+            : memories.count
     }
-
+    
     func collectionView(
         _ collectionView: UICollectionView,
         cellForItemAt indexPath: IndexPath
     ) -> UICollectionViewCell {
-
+        
         if collectionView == membersCollectionView {
             let cell = collectionView.dequeueReusableCell(
                 withReuseIdentifier: "FamilyMemberCell",
                 for: indexPath
             ) as! FamilyMemberCollectionViewCell
-
+            
             let member = members[indexPath.item]
+            
+            // Configure with member data
+            // Note: You'll need to add a method to load profile images
+            // For now, using placeholder
             cell.configure(
                 name: member.name,
-                image: UIImage(named: member.imageName)
+                image: UIImage(systemName: "person.circle.fill")?.withTintColor(.systemGray, renderingMode: .alwaysOriginal)
             )
+            
+            // Add admin badge if needed
+            if member.isAdmin {
+                // You can add an admin badge overlay here
+            }
+            
             return cell
         }
-
+        
+        // Memory cell
         let cell = collectionView.dequeueReusableCell(
             withReuseIdentifier: "FamilyMemoriesCell",
             for: indexPath
         ) as! FamilyMemoriesCollectionViewCell
-
-        let post = posts[indexPath.item]
+        
+        let memory = memories[indexPath.item]
+        
+        // Configure with memory data
         cell.configure(
-            prompt: post.prompt,
-            author: post.author,
-            image: UIImage(named: post.imageName)
+            prompt: memory.title,
+            author: memory.userName ?? "Unknown",
+            image: nil  // Placeholder - you'll need to load actual images
         )
+        
+        // Optional: Add content preview
+        if let content = memory.content, !content.isEmpty {
+            // You could add a subtitle or adjust the prompt label
+        }
+        
         return cell
     }
-
+    
     func collectionView(
         _ collectionView: UICollectionView,
         didSelectItemAt indexPath: IndexPath
     ) {
         if collectionView == membersCollectionView {
-            print("Tapped Member:", members[indexPath.item].name)
+            let member = members[indexPath.item]
+            print("Tapped Member: \(member.name)")
+            // You could show member details here
         } else {
-            print("Tapped Post:", posts[indexPath.item].prompt)
+            let memory = memories[indexPath.item]
+            print("Tapped Memory: \(memory.title)")
+            // You could show memory details here
         }
+    }
+}
+
+// MARK: - UI Updates
+extension FamilyMemberViewController {
+    private func showLoadingState() {
+        membersLoadingIndicator.startAnimating()
+        memoriesLoadingIndicator.startAnimating()
+        membersEmptyLabel.isHidden = true
+        memoriesEmptyLabel.isHidden = true
+    }
+    
+    private func hideLoadingState() {
+        membersLoadingIndicator.stopAnimating()
+        memoriesLoadingIndicator.stopAnimating()
     }
 }
