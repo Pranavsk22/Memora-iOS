@@ -6,6 +6,9 @@ final class MemoryViewController: UIViewController {
     @IBOutlet weak var recentsCollectionView: UICollectionView!
     @IBOutlet weak var recentsLabel: UILabel! // optional - for the "Recents" heading
 
+    // Premium card (connect the premium container view in XIB: id="Qdr-Sv-6fx")
+    @IBOutlet weak var premiumCardView: UIView!
+
     // New: categories collection view (connect in XIB)
     @IBOutlet weak var categoriesCollectionView: UICollectionView!
 
@@ -61,6 +64,7 @@ final class MemoryViewController: UIViewController {
         super.viewDidLoad()
         
         setupNavigationBar()
+        setupPremiumCardTap()
 
         // Set title and prefer large title for this VC (will be enabled in viewWillAppear)
 
@@ -285,6 +289,29 @@ final class MemoryViewController: UIViewController {
         navigationController?.pushViewController(listing, animated: true)
     }
 
+    // MARK: - Premium
+    private func setupPremiumCardTap() {
+        // Outlet must be connected in XIB
+        premiumCardView.isUserInteractionEnabled = true
+        premiumCardView.accessibilityTraits = .button
+        premiumCardView.accessibilityLabel = "Premium subscription"
+
+        let tap = UITapGestureRecognizer(target: self, action: #selector(premiumCardTapped))
+        premiumCardView.addGestureRecognizer(tap)
+    }
+    @objc private func premiumCardTapped() {
+        let vc = PremiumSubscriptionViewController()
+        vc.modalPresentationStyle = .pageSheet
+
+        if let sheet = vc.sheetPresentationController {
+            sheet.detents = [.large()]
+            sheet.selectedDetentIdentifier = .large
+            sheet.prefersGrabberVisible = true
+            sheet.prefersScrollingExpandsWhenScrolledToEdge = true
+        }
+
+        present(vc, animated: true)
+    }
 }
 
 // MARK: - UICollectionViewDataSource & Delegate
@@ -431,3 +458,4 @@ extension MemoryViewController: MemoryCollectionViewCellDelegate {
         print("memoryCollectionViewCellDidTap: couldn't determine indexPath")
     }
 }
+

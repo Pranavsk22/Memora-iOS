@@ -39,11 +39,18 @@ final class CategoryCollectionViewCell: UICollectionViewCell {
         accessibilityTraits = .button
     }
 
-    func configure(icon: UIImage?, text: String, tint: UIColor? = nil) {
-        iconImageView.image = icon?.withRenderingMode(.alwaysTemplate)
+    func configure(iconSystemName: String?, text: String, tint: UIColor? = nil) {
+        if let iconSystemName = iconSystemName {
+            let image = UIImage(systemName: iconSystemName)
+            iconImageView.image = image?.withRenderingMode(.alwaysTemplate)
+        } else {
+            iconImageView.image = nil
+        }
+
         if let tint = tint {
             iconImageView.tintColor = tint
         }
+
         titleLabel.text = text
         accessibilityLabel = text
     }
