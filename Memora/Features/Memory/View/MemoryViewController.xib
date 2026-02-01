@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24506" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
     <device id="retina6_12" orientation="portrait" appearance="light"/>
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="System colors in document resources" minToolsVersion="11.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
@@ -11,6 +11,7 @@
         <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner" customClass="MemoryViewController" customModule="Home">
             <connections>
                 <outlet property="categoriesCollectionView" destination="Lpo-7M-CT9" id="BjU-xd-vUe"/>
+                <outlet property="premiumCardView" destination="Qdr-Sv-6fx" id="oeV-5e-NP1"/>
                 <outlet property="privateCollectionView" destination="9Mj-BA-xKv" id="ATz-QC-gjx"/>
                 <outlet property="recentsCollectionView" destination="CCD-bV-Z04" id="PBr-Ho-GzJ"/>
                 <outlet property="recentsLabel" destination="QNQ-PX-vLi" id="wfi-es-9FZ"/>

@@ -179,7 +179,7 @@ extension HomeViewController: UICollectionViewDataSource {
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "CategoryCell", for: indexPath)
             guard let categoryCell = cell as? CategoryCollectionViewCell else { return cell }
             let category = categories[indexPath.item]
-            categoryCell.configure(icon: UIImage(named: category.iconName ?? ""), text: category.title)
+            categoryCell.configure(iconSystemName: category.iconSystemName, text: category.title)
             return categoryCell
 
         } else if collectionView == exploreCollectionView {

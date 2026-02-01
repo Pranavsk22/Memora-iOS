@@ -20,16 +20,17 @@ class AuthState: ObservableObject {
     static let shared = AuthState()
     
     private init() {
-        checkAuthStatus()
+        Task { await checkAuthStatus() }
     }
     
-    func checkAuthStatus() {
+    func checkAuthStatus() async {
         isAuthenticated = SupabaseManager.shared.isUserLoggedIn()
         
         if isAuthenticated {
-            Task {
-                await loadUserProfile()
-            }
+            await loadUserProfile()
+        } else {
+            userProfile = nil
+            errorMessage = nil
         }
     }
     
@@ -65,7 +66,7 @@ class AuthState: ObservableObject {
             
             // 5. Update state
             isAuthenticated = true
-            await loadUserProfile()
+            await checkAuthStatus()
             
             return true
         } catch {
@@ -84,7 +85,7 @@ class AuthState: ObservableObject {
         do {
             try await SupabaseManager.shared.signIn(email: email, password: password)
             isAuthenticated = true
-            await loadUserProfile()
+            await checkAuthStatus()
             return true
         } catch {
             errorMessage = error.localizedDescription
@@ -97,8 +98,7 @@ class AuthState: ObservableObject {
         do {
             try await SupabaseManager.shared.signOut()
             isAuthenticated = false
-            userProfile = nil
-            errorMessage = nil
+            await checkAuthStatus()
         } catch {
             errorMessage = error.localizedDescription
             print("Sign out error: \(error)")
