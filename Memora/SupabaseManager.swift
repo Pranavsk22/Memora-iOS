@@ -2113,45 +2113,55 @@ extension SupabaseManager {
         print("DEBUG: Attempting to share memory \(memoryId) with group \(groupId)")
         print("DEBUG: Current user ID: \(userId)")
         
-        // DECODE PROPERLY using SupabaseMemory struct instead of [String: AnyJSON]
+        // First, verify the user owns the memory
         let memoryCheck = try await client
             .from("memories")
-            .select("id, user_id, visibility")
+            .select("id, user_id")
             .eq("id", value: memoryId.uuidString)
             .single()
             .execute()
         
-        // Decode using the proper struct
-        struct MemoryCheckResponse: Decodable {
+        struct MemoryOwnerCheck: Decodable {
             let id: UUID
             let userId: UUID
-            let visibility: String
             
             enum CodingKeys: String, CodingKey {
                 case id
                 case userId = "user_id"
-                case visibility
             }
         }
         
-        let memory = try jsonDecoder.decode(MemoryCheckResponse.self, from: memoryCheck.data)
+        let memory = try jsonDecoder.decode(MemoryOwnerCheck.self, from: memoryCheck.data)
         
-        print("DEBUG: Memory owner ID: \(memory.userId)")
-        print("DEBUG: Memory visibility: \(memory.visibility)")
-        
-        // FIXED: Only allow sharing if user OWNS the memory
-        // Remove the "everyone" visibility check - that doesn't grant sharing rights
+        // Check if current user is the owner
         guard memory.userId.uuidString.lowercased() == userId.lowercased() else {
             print("DEBUG: Permission denied - user \(userId) doesn't own memory \(memory.id)")
             throw NSError(domain: "SupabaseManager", code: 403,
                           userInfo: [NSLocalizedDescriptionKey: "You don't have permission to share this memory"])
         }
         
-        print("DEBUG: User owns memory, proceeding with sharing...")
+        print("DEBUG: User owns memory, verifying group membership...")
+        
+        // Check if user is a member of the group
+        let membershipCheck = try await client
+            .from("group_members")
+            .select("user_id")
+            .eq("group_id", value: groupId.uuidString)
+            .eq("user_id", value: userId)
+            .execute()
+        
+        if let jsonArray = try? JSONSerialization.jsonObject(with: membershipCheck.data) as? [[String: Any]],
+           jsonArray.isEmpty {
+            print("DEBUG: User is not a member of group \(groupId)")
+            throw NSError(domain: "SupabaseManager", code: 403,
+                          userInfo: [NSLocalizedDescriptionKey: "You must be a member of the group to share memories"])
+        }
+        
+        print("DEBUG: User is group member, checking if already shared...")
         
         // Check if already shared with group
         let existingCheck = try await client
-            .from("memory_group_access")
+            .from("group_memories")
             .select("id")
             .eq("memory_id", value: memoryId.uuidString)
             .eq("group_id", value: groupId.uuidString)
@@ -2164,6 +2174,7 @@ extension SupabaseManager {
         }
         
         // Create group memory link
+        print("DEBUG: Creating entry in group_memories...")
         try await client
             .from("group_memories")
             .insert([
@@ -2175,7 +2186,8 @@ extension SupabaseManager {
         
         print("DEBUG: Created entry in group_memories")
         
-        // Also create memory_group_access for all group members
+        // Now create memory_group_access entry
+        print("DEBUG: Creating memory_group_access entry...")
         try await client
             .from("memory_group_access")
             .insert([
@@ -2184,7 +2196,7 @@ extension SupabaseManager {
             ])
             .execute()
         
-        print("Memory shared with group successfully")
+        print("DEBUG: Memory shared with group successfully")
     }
     
     /// Create a memory specifically for a group (group-only memory)

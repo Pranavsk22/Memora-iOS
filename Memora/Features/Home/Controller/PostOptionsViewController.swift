@@ -621,7 +621,19 @@ final class PostOptionsViewController: UIViewController {
             self?.updateGroupSelectionButtonTitle()
             self?.updatePostButtonState()
         }
-        present(vc, animated: true)
+        
+        // Embed in a navigation controller
+        let navController = UINavigationController(rootViewController: vc)
+        
+        // Optional: Customize the navigation bar appearance
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = .systemBackground
+        navController.navigationBar.standardAppearance = appearance
+        navController.navigationBar.scrollEdgeAppearance = appearance
+        
+        // Present the navigation controller instead of the view controller directly
+        present(navController, animated: true)
     }
     
     private func updateGroupSelectionButtonTitle() {

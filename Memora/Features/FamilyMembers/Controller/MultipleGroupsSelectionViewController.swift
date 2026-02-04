@@ -33,6 +33,15 @@ class MultipleGroupsSelectionViewController: UITableViewController {
         navigationController?.navigationBar.prefersLargeTitles = false
     }
     
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        
+        // Save selections if the user swipes down to dismiss
+        if isBeingDismissed {
+            onSelectionComplete?(selectedGroups)
+        }
+    }
+    
     // MARK: - Setup
     private func setupUI() {
         title = "Select Groups"
