@@ -277,3 +277,52 @@ struct ConfettiParticle: Identifiable {
     let color: Color
     var opacity: Double
 }
+
+
+// MARK: - UIKit Wrapper for Presentation
+import UIKit
+
+class GiftBoxOverlayViewController: UIViewController {
+    private let memoryTitle: String
+    private let onComplete: () -> Void
+    
+    init(memoryTitle: String, onComplete: @escaping () -> Void) {
+        self.memoryTitle = memoryTitle
+        self.onComplete = onComplete
+        super.init(nibName: nil, bundle: nil)
+        self.modalPresentationStyle = .overFullScreen // Critical for transparency
+        self.modalTransitionStyle = .crossDissolve
+    }
+    
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.7) // Dimmed background
+        
+        // Host the SwiftUI View
+        let animationView = GiftBoxAnimationView(
+            onOpenComplete: { [weak self] in
+                self?.dismiss(animated: true) {
+                    self?.onComplete()
+                }
+            },
+            memoryTitle: memoryTitle
+        )
+        
+        let hostingController = UIHostingController(rootView: animationView)
+        hostingController.view.backgroundColor = .clear
+        hostingController.view.translatesAutoresizingMaskIntoConstraints = false
+        
+        addChild(hostingController)
+        view.addSubview(hostingController.view)
+        hostingController.didMove(toParent: self)
+        
+        NSLayoutConstraint.activate([
+            hostingController.view.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            hostingController.view.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            hostingController.view.widthAnchor.constraint(equalTo: view.widthAnchor),
+            hostingController.view.heightAnchor.constraint(equalTo: view.heightAnchor)
+        ])
+    }
+}

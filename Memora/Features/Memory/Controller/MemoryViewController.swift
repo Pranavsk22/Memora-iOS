@@ -158,16 +158,14 @@ final class MemoryViewController: UIViewController {
             container.isHidden = false
             print("🔄 Forced container.isHidden = false")
             
-            container.layer.borderWidth = 3
-            container.layer.borderColor = UIColor.green.cgColor
+            
         }
         
         // Check number of items
         let itemCount = scheduledVisibilityMemories.count
         print("Scheduled memories count: \(itemCount)")
         
-        // Force a redraw with colored background to see if it's visible
-        scheduledCollectionView.backgroundColor = .yellow.withAlphaComponent(0.3)
+       
         
         // If still not visible, check constraints
         print("Collection view constraints: \(scheduledCollectionView.constraints)")
@@ -339,7 +337,7 @@ final class MemoryViewController: UIViewController {
         print("Section inset: \(layout.sectionInset)")
         
         // Register the cell - CRITICAL STEP!
-        registerScheduledCollectionViewCells(collectionView)
+        collectionView.register(MemoryCapsuleCell.self, forCellWithReuseIdentifier: MemoryCapsuleCell.reuseId)
         
         // Add to scheduledContainerView
         scheduledContainerView.addSubview(collectionView)
@@ -920,104 +918,24 @@ extension MemoryViewController: UICollectionViewDataSource, UICollectionViewDele
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         
-        // Scheduled Memories Collection View
-        if collectionView == scheduledCollectionView {
-            let memory = scheduledVisibilityMemories[indexPath.item]
+
             
-            print("🔄 Creating scheduled memory cell at index: \(indexPath.item), title: \(memory.title)")
-            
-            // Convert SupabaseMemory to ScheduledMemory
-            let scheduledMemory = convertToScheduledMemory(memory)
-            
-            // Dequeue MemoryCapsuleCell
-            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: capsuleCellReuseId, for: indexPath) as? MemoryCapsuleCell else {
-                print("❌ Failed to dequeue MemoryCapsuleCell")
+            if collectionView == scheduledCollectionView {
+                let memory = scheduledVisibilityMemories[indexPath.item]
                 
-                // Fallback: Create a basic cell
-                let cell = collectionView.dequeueReusableCell(withReuseIdentifier: capsuleCellReuseId, for: indexPath)
-                print("⚠️ Using fallback basic cell")
+                // Convert to ScheduledMemory model
+                let scheduledMemory = convertToScheduledMemory(memory)
                 
-                // Create capsule UI directly
-                cell.contentView.backgroundColor = UIColor(hex: "#5AC8FA").withAlphaComponent(0.1)
-                cell.contentView.layer.cornerRadius = 16
-                cell.contentView.layer.borderWidth = 2
-                cell.contentView.layer.borderColor = UIColor(hex: "#5AC8FA").cgColor
-                cell.contentView.clipsToBounds = true
-                
-                // Add title label
-                let titleLabel = UILabel()
-                titleLabel.text = memory.title
-                titleLabel.font = UIFont.systemFont(ofSize: 16, weight: .bold)
-                titleLabel.textColor = .label
-                titleLabel.textAlignment = .center
-                titleLabel.numberOfLines = 2
-                titleLabel.translatesAutoresizingMaskIntoConstraints = false
-                cell.contentView.addSubview(titleLabel)
-                
-                // Add date label
-                let dateLabel = UILabel()
-                if let releaseDate = memory.releaseAt {
-                    let formatter = DateFormatter()
-                    formatter.dateStyle = .medium
-                    formatter.timeStyle = .short
-                    dateLabel.text = "Unlocks: \(formatter.string(from: releaseDate))"
-                    
-                    // Check if ready to open
-                    if releaseDate <= Date() {
-                        dateLabel.text = "Ready to open! 🎁"
-                        dateLabel.textColor = .systemGreen
-                        cell.contentView.backgroundColor = UIColor(hex: "#5AC8FA").withAlphaComponent(0.3)
-                    }
-                } else {
-                    dateLabel.text = "No release date"
+                guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: MemoryCapsuleCell.reuseId, for: indexPath) as? MemoryCapsuleCell else {
+                    return UICollectionViewCell()
                 }
-                dateLabel.font = UIFont.systemFont(ofSize: 12)
-                dateLabel.textColor = .secondaryLabel
-                dateLabel.textAlignment = .center
-                dateLabel.translatesAutoresizingMaskIntoConstraints = false
-                cell.contentView.addSubview(dateLabel)
                 
-                // Add gift icon
-                let giftIcon = UIImageView(image: UIImage(systemName: "gift.fill"))
-                giftIcon.tintColor = UIColor(hex: "#5AC8FA")
-                giftIcon.translatesAutoresizingMaskIntoConstraints = false
-                cell.contentView.addSubview(giftIcon)
-                
-                // Add tap gesture
-                let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleCapsuleTapGesture(_:)))
-                cell.contentView.addGestureRecognizer(tapGesture)
-                cell.contentView.isUserInteractionEnabled = true
-                cell.tag = indexPath.item // Store index for tap handling
-                
-                // Constraints
-                NSLayoutConstraint.activate([
-                    giftIcon.centerXAnchor.constraint(equalTo: cell.contentView.centerXAnchor),
-                    giftIcon.topAnchor.constraint(equalTo: cell.contentView.topAnchor, constant: 30),
-                    giftIcon.widthAnchor.constraint(equalToConstant: 50),
-                    giftIcon.heightAnchor.constraint(equalToConstant: 50),
-                    
-                    titleLabel.topAnchor.constraint(equalTo: giftIcon.bottomAnchor, constant: 20),
-                    titleLabel.leadingAnchor.constraint(equalTo: cell.contentView.leadingAnchor, constant: 12),
-                    titleLabel.trailingAnchor.constraint(equalTo: cell.contentView.trailingAnchor, constant: -12),
-                    
-                    dateLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
-                    dateLabel.leadingAnchor.constraint(equalTo: cell.contentView.leadingAnchor, constant: 12),
-                    dateLabel.trailingAnchor.constraint(equalTo: cell.contentView.trailingAnchor, constant: -12)
-                ])
+                cell.configure(with: scheduledMemory) { [weak self] in
+                    self?.handleCapsuleTap(memory: memory)
+                }
                 
                 return cell
             }
-            
-            print("✅ Successfully dequeued MemoryCapsuleCell")
-            
-            // Configure the UIKit-only cell (NO SwiftUI parent controller needed)
-            cell.configure(with: scheduledMemory) { [weak self] in
-                // Handle tap on capsule
-                self?.handleCapsuleTap(memory: memory)
-            }
-            
-            return cell
-        }
         
         // Recents
         if collectionView == recentsCollectionView {
@@ -1079,47 +997,40 @@ extension MemoryViewController: UICollectionViewDataSource, UICollectionViewDele
     }
 
     // Keep your existing handleCapsuleTap method
+ 
     private func handleCapsuleTap(memory: SupabaseMemory) {
-        print("🎯 Tapped scheduled memory: \(memory.title)")
+        // Check if ready
+        let isReady = (memory.releaseAt ?? Date()) <= Date()
         
-        if let releaseDate = memory.releaseAt {
-            let isReady = releaseDate <= Date()
+        if isReady {
+            // 1. Trigger Haptic Feedback
+            let generator = UIImpactFeedbackGenerator(style: .heavy)
+            generator.impactOccurred()
             
-            if isReady {
-                // Ready to open
-                let alert = UIAlertController(
-                    title: "Open Memory Capsule? 🎁",
-                    message: "\(memory.title) is ready to be opened!",
-                    preferredStyle: .alert
-                )
-                alert.addAction(UIAlertAction(title: "Open Now", style: .default) { _ in
-                    print("Opening memory: \(memory.id)")
-                    self.navigateToDetail(for: memory)
-                })
-                alert.addAction(UIAlertAction(title: "Later", style: .cancel))
-                present(alert, animated: true)
-            } else {
-                // Not ready yet
-                let formatter = DateFormatter()
-                formatter.dateStyle = .medium
-                formatter.timeStyle = .short
-                
-                let alert = UIAlertController(
-                    title: "Memory Capsule 🔒",
-                    message: "\(memory.title) will unlock on:\n\(formatter.string(from: releaseDate))",
-                    preferredStyle: .alert
-                )
-                alert.addAction(UIAlertAction(title: "OK", style: .default))
-                present(alert, animated: true)
+            // 2. Present Gift Box Animation
+            let animationVC = GiftBoxOverlayViewController(memoryTitle: memory.title) { [weak self] in
+                // 3. Navigate after animation finishes
+                self?.navigateToDetail(for: memory)
             }
+            
+            self.present(animationVC, animated: true)
+            
         } else {
-            // No release date
+            // Locked State Animation (Shake the cell?)
+            let generator = UINotificationFeedbackGenerator()
+            generator.notificationOccurred(.error)
+            
+            // Show Timer Alert
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .short
+            
             let alert = UIAlertController(
-                title: memory.title,
-                message: "This memory doesn't have a release date.",
+                title: "Still Locked 🔒",
+                message: "This memory is sealed until:\n\(formatter.string(from: memory.releaseAt ?? Date()))",
                 preferredStyle: .alert
             )
-            alert.addAction(UIAlertAction(title: "OK", style: .default))
+            alert.addAction(UIAlertAction(title: "OK", style: .cancel))
             present(alert, animated: true)
         }
     }
@@ -1140,11 +1051,15 @@ extension MemoryViewController: UICollectionViewDataSource, UICollectionViewDele
     }
 
     // Cell sizes
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout,
-                        sizeForItemAt indexPath: IndexPath) -> CGSize {
+    // In MemoryViewController.swift
+
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         if collectionView == recentsCollectionView { return CGSize(width: 299, height: 166) }
         if collectionView == categoriesCollectionView { return CGSize(width: 105, height: 99) }
-        if collectionView == scheduledCollectionView { return CGSize(width: 160, height: 220) }
+        
+        // THIS IS THE UPDATE YOU WANT:
+        if collectionView == scheduledCollectionView { return CGSize(width: 170, height: 210) }
+        
         return CGSize(width: 105, height: 99)
     }
 
