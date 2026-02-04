@@ -648,73 +648,7 @@ extension GroupsListViewController: UITableViewDataSource, UITableViewDelegate {
         return UISwipeActionsConfiguration(actions: [leaveAction])
     }
     
-//    private func confirmDeleteGroup(group: UserGroup, at indexPath: IndexPath) {
-//        let alert = UIAlertController(
-//            title: "Delete Group",
-//            message: "Are you sure you want to delete '\(group.name)'? This action cannot be undone.",
-//            preferredStyle: .alert
-//        )
-//        
-//        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-//        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
-//            self?.deleteGroup(group: group, at: indexPath)
-//        })
-//        
-//        present(alert, animated: true)
-//    }
-    
-//    private func confirmLeaveGroup(group: UserGroup, at indexPath: IndexPath) {
-//        let alert = UIAlertController(
-//            title: "Leave Group",
-//            message: "Are you sure you want to leave '\(group.name)'?",
-//            preferredStyle: .alert
-//        )
-//        
-//        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-//        alert.addAction(UIAlertAction(title: "Leave", style: .destructive) { [weak self] _ in
-//            self?.leaveGroup(group: group, at: indexPath)
-//        })
-//        
-//        present(alert, animated: true)
-//    }
-    
-//    private func deleteGroup(group: UserGroup, at indexPath: IndexPath) {
-//        Task {
-//            do {
-//                try await SupabaseManager.shared.deleteGroup(groupId: group.id)
-//                
-//                DispatchQueue.main.async {
-//                    self.groups.remove(at: indexPath.row)
-//                    self.tableView.deleteRows(at: [indexPath], with: .automatic)
-//                    self.emptyStateView.isHidden = !self.groups.isEmpty
-//                }
-//            } catch {
-//                DispatchQueue.main.async {
-//                    self.showAlert(title: "Error", message: error.localizedDescription)
-//                }
-//            }
-//        }
-//    }
-//    
-//    private func leaveGroup(group: UserGroup, at indexPath: IndexPath) {
-//        guard let userId = SupabaseManager.shared.getCurrentUserId() else { return }
-//        
-//        Task {
-//            do {
-//                try await SupabaseManager.shared.removeGroupMember(groupId: group.id, userId: userId)
-//                
-//                DispatchQueue.main.async {
-//                    self.groups.remove(at: indexPath.row)
-//                    self.tableView.deleteRows(at: [indexPath], with: .automatic)
-//                    self.emptyStateView.isHidden = !self.groups.isEmpty
-//                }
-//            } catch {
-//                DispatchQueue.main.async {
-//                    self.showAlert(title: "Error", message: error.localizedDescription)
-//                }
-//            }
-//        }
-//    }
+
 }
 
 // MARK: - GroupActionSheetDelegate

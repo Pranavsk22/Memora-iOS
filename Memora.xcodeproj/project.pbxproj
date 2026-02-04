@@ -44,17 +44,29 @@
 		1FC49DD52ED4ABED005D98B6 /* Exceptions for "Memora" folder in "Memora" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
+				Extensions.swift,
 				Info.plist,
 			);
 			target = 25AF4C612EBA115B00B4F8F7 /* Memora */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		1FA8AE6F2F321F060049FE76 /* Exceptions for "Memora" folder in "Copy Bundle Resources" phase from "Memora" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = 25AF4C602EBA115B00B4F8F7 /* Resources */;
+			membershipExceptions = (
+				Extensions.swift,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		25AF4C642EBA115B00B4F8F7 /* Memora */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				1FC49DD52ED4ABED005D98B6 /* Exceptions for "Memora" folder in "Memora" target */,
+				1FA8AE6F2F321F060049FE76 /* Exceptions for "Memora" folder in "Copy Bundle Resources" phase from "Memora" target */,
 			);
 			path = Memora;
 			sourceTree = "<group>";

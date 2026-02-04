@@ -346,15 +346,58 @@ extension FamilyMemberViewController: UICollectionViewDataSource, UICollectionVi
         _ collectionView: UICollectionView,
         didSelectItemAt indexPath: IndexPath
     ) {
+        collectionView.deselectItem(at: indexPath, animated: true)
+        
         if collectionView == membersCollectionView {
             let member = members[indexPath.item]
             print("Tapped Member: \(member.name)")
-            // You could show member details here
+            // You could show member details here if needed
         } else {
             let memory = memories[indexPath.item]
             print("Tapped Memory: \(memory.title)")
-            // You could show memory details here
+            
+            // 🚨 CRITICAL FIX: Actually navigate to detail view
+            showMemoryDetail(memory: memory)
         }
+    }
+
+    // Add this method to show memory detail
+    private func showMemoryDetail(memory: GroupMemory) {
+        // Fetch media items for this memory
+        Task {
+            do {
+                let mediaItems = try await fetchMediaForMemory(memoryId: memory.id)
+                
+                DispatchQueue.main.async {
+                    print("DEBUG: Passing \(mediaItems.count) media items to detail view")
+                    for item in mediaItems {
+                        print("  - Type: \(item.mediaType), Content: \(item.textContent ?? "nil")")
+                    }
+                    
+                    let detailVC = GroupMemoryViewController(memory: memory, mediaItems: mediaItems)
+                    self.navigationController?.pushViewController(detailVC, animated: true)
+                }
+            } catch {
+                print("Failed to fetch media: \(error)")
+                DispatchQueue.main.async {
+                    // Show detail view without media if fetch fails
+                    let detailVC = GroupMemoryViewController(memory: memory, mediaItems: [])
+                    self.navigationController?.pushViewController(detailVC, animated: true)
+                }
+            }
+        }
+    }
+
+    // Add this helper method
+    private func fetchMediaForMemory(memoryId: String) async throws -> [SupabaseMemoryMedia] {
+        let response = try await SupabaseManager.shared.client
+            .from("memory_media")
+            .select("*")
+            .eq("memory_id", value: memoryId)
+            .order("sort_order", ascending: true)
+            .execute()
+        
+        return try SupabaseManager.shared.jsonDecoder.decode([SupabaseMemoryMedia].self, from: response.data)
     }
 }
 

@@ -66,88 +66,104 @@ final class RecentCollectionViewCell: UICollectionViewCell {
       /// Configure with Memory and optional remote image URL string
       /// - memory: Memory model
       /// - imageURLString: optional remote URL override (e.g. unsplash link). If nil, the cell will prefer local attachment if available.
-      func configure(with memory: Memory, imageURLString: String?) {
-          titleLabel.text = memory.title
-
-          // Make sure cell visible while loading
-          contentView.isHidden = false
-          imageView.alpha = 1.0
-          imageView.backgroundColor = UIColor(white: 0.95, alpha: 1)
-          imageView.image = nil
-
-          // Cancel any previous
-          if let prev = currentImageURL {
-              ImageLoader.shared.cancelLoad(for: prev)
-              currentImageURL = nil
-          }
-
-          // Start indicator
-          DispatchQueue.main.async {
-              self.activityIndicator?.startAnimating()
-          }
-
-          // 1) Prefer local attachment if present and file exists on disk
-          if let firstAttachment = memory.attachments.first(where: { $0.kind == .image }) {
-              let filename = firstAttachment.filename.trimmingCharacters(in: .whitespacesAndNewlines)
-              let localURL = MemoryStore.shared.urlForAttachment(filename: filename)
-              if FileManager.default.fileExists(atPath: localURL.path) {
-                  // load from disk
-                  ImageLoader.shared.loadLocal(from: localURL) { [weak self] image in
-                      guard let self = self else { return }
-                      DispatchQueue.main.async {
-                          self.activityIndicator?.stopAnimating()
-                          self.setImageWithFade(image)
-                      }
-                  }
-                  return
-              }
-
-              // If filename itself is a remote url, we will consider it below unless we have explicit override
-          }
-
-          // 2) If caller passed explicit remote image URL, use it
-          if let s = imageURLString?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty,
-             let url = URL(string: s), s.hasPrefix("http") {
-              currentImageURL = url
-              ImageLoader.shared.load(from: url) { [weak self] image in
-                  guard let self = self else { return }
-                  DispatchQueue.main.async {
-                      // ensure still the expected URL
-                      if self.currentImageURL == url {
-                          self.activityIndicator?.stopAnimating()
-                          self.setImageWithFade(image)
-                      }
-                  }
-              }
-              return
-          }
-
-          // 3) If first attachment is remote URL, use it
-          if let firstAttachment = memory.attachments.first(where: { $0.kind == .image }) {
-              let filename = firstAttachment.filename.trimmingCharacters(in: .whitespacesAndNewlines)
-              if let url = URL(string: filename), filename.hasPrefix("http") {
-                  currentImageURL = url
-                  ImageLoader.shared.load(from: url) { [weak self] image in
-                      guard let self = self else { return }
-                      DispatchQueue.main.async {
-                          if self.currentImageURL == url {
-                              self.activityIndicator?.stopAnimating()
-                              self.setImageWithFade(image)
-                          }
-                      }
-                  }
-                  return
-              }
-          }
-
-          // 4) Nothing available — stop indicator and set placeholder
-          DispatchQueue.main.async {
-              self.activityIndicator?.stopAnimating()
-              self.imageView.image = UIImage(systemName: "photo")
-              self.imageView.tintColor = UIColor(white: 0.75, alpha: 1)
-              self.imageView.backgroundColor = UIColor(white: 0.95, alpha: 1)
-          }
-      }
+//      func configure(with memory: Memory, imageURLString: String?) {
+//          titleLabel.text = memory.title
+//
+//          // Make sure cell visible while loading
+//          contentView.isHidden = false
+//          imageView.alpha = 1.0
+//          imageView.backgroundColor = UIColor(white: 0.95, alpha: 1)
+//          imageView.image = nil
+//
+//          // Cancel any previous
+//          if let prev = currentImageURL {
+//              ImageLoader.shared.cancelLoad(for: prev)
+//              currentImageURL = nil
+//          }
+//
+//          // Start indicator
+//          DispatchQueue.main.async {
+//              self.activityIndicator?.startAnimating()
+//          }
+//
+//          // 1) Prefer local attachment if present and file exists on disk
+//          if let firstAttachment = memory.attachments.first(where: { $0.kind == .image }) {
+//              let filename = firstAttachment.filename.trimmingCharacters(in: .whitespacesAndNewlines)
+//              let localURL = MemoryStore.shared.urlForAttachment(filename: filename)
+//              if FileManager.default.fileExists(atPath: localURL.path) {
+//                  // load from disk
+//                  ImageLoader.shared.loadLocal(from: localURL) { [weak self] image in
+//                      guard let self = self else { return }
+//                      DispatchQueue.main.async {
+//                          self.activityIndicator?.stopAnimating()
+//                          self.setImageWithFade(image)
+//                      }
+//                  }
+//                  return
+//              }
+//
+//              // If filename itself is a remote url, we will consider it below unless we have explicit override
+//          }
+//
+//          // 2) If caller passed explicit remote image URL, use it
+//          if let s = imageURLString?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty,
+//             let url = URL(string: s), s.hasPrefix("http") {
+//              currentImageURL = url
+//              ImageLoader.shared.load(from: url) { [weak self] image in
+//                  guard let self = self else { return }
+//                  DispatchQueue.main.async {
+//                      // ensure still the expected URL
+//                      if self.currentImageURL == url {
+//                          self.activityIndicator?.stopAnimating()
+//                          self.setImageWithFade(image)
+//                      }
+//                  }
+//              }
+//              return
+//          }
+//
+//          // 3) If first attachment is remote URL, use it
+//          if let firstAttachment = memory.attachments.first(where: { $0.kind == .image }) {
+//              let filename = firstAttachment.filename.trimmingCharacters(in: .whitespacesAndNewlines)
+//              if let url = URL(string: filename), filename.hasPrefix("http") {
+//                  currentImageURL = url
+//                  ImageLoader.shared.load(from: url) { [weak self] image in
+//                      guard let self = self else { return }
+//                      DispatchQueue.main.async {
+//                          if self.currentImageURL == url {
+//                              self.activityIndicator?.stopAnimating()
+//                              self.setImageWithFade(image)
+//                          }
+//                      }
+//                  }
+//                  return
+//              }
+//          }
+//
+//          // 4) Nothing available — stop indicator and set placeholder
+//          DispatchQueue.main.async {
+//              self.activityIndicator?.stopAnimating()
+//              self.imageView.image = UIImage(systemName: "photo")
+//              self.imageView.tintColor = UIColor(white: 0.75, alpha: 1)
+//              self.imageView.backgroundColor = UIColor(white: 0.95, alpha: 1)
+//          }
+//      }
+//    
+//    
+    /// Configure with SupabaseMemory
+    func configure(with supabaseMemory: SupabaseMemory, imageURLString: String?) {
+        titleLabel.text = supabaseMemory.title
+        
+        // Reset UI
+        activityIndicator?.stopAnimating()
+        imageView.image = nil
+        imageView.backgroundColor = UIColor(white: 0.95, alpha: 1)
+        
+        // TODO: Fetch memory media to get actual images
+        // For now, use placeholder
+        imageView.image = UIImage(systemName: "photo")
+        imageView.tintColor = UIColor(white: 0.75, alpha: 1)
+    }
 
       // helper: fade-in
       private func setImageWithFade(_ image: UIImage?) {
