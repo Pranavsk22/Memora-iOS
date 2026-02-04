@@ -1,10 +1,3 @@
-//
-//  FamilyMemberViewController.swift
-//  Memora
-//
-//  Created by user@3 on 10/11/25.
-//
-
 import UIKit
 
 class FamilyMemberViewController: UIViewController {
@@ -98,7 +91,7 @@ class FamilyMemberViewController: UIViewController {
         
         if let layout = membersCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
             layout.scrollDirection = .horizontal
-            layout.itemSize = CGSize(width: 150, height: 190)
+            layout.itemSize = CGSize(width: 100, height: 140) // Adjusted for name label
             layout.minimumLineSpacing = 16
             layout.sectionInset = UIEdgeInsets(
                 top: 0,
@@ -122,6 +115,10 @@ class FamilyMemberViewController: UIViewController {
         postsCollectionView.backgroundColor = .clear
         postsCollectionView.showsVerticalScrollIndicator = false
         
+        // Add long press gesture for memory deletion
+        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
+        postsCollectionView.addGestureRecognizer(longPressGesture)
+        
         if let layout = postsCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
             layout.scrollDirection = .vertical
             layout.minimumLineSpacing = 35
@@ -135,6 +132,114 @@ class FamilyMemberViewController: UIViewController {
                 width: view.bounds.width - 32,
                 height: 394
             )
+        }
+    }
+    
+    // MARK: - Long Press Gesture for Memory Deletion
+    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        
+        let point = gesture.location(in: postsCollectionView)
+        guard let indexPath = postsCollectionView.indexPathForItem(at: point) else { return }
+        
+        let memory = memories[indexPath.item]
+        let currentUserId = SupabaseManager.shared.getCurrentUserId()
+        
+        // Check if current user is the memory owner
+        let isOwner = memory.userId?.lowercased() == currentUserId?.lowercased()
+        
+        showMemoryOptions(for: memory, isOwner: isOwner, at: indexPath)
+    }
+    
+    private func showMemoryOptions(for memory: GroupMemory, isOwner: Bool, at indexPath: IndexPath) {
+        let alert = UIAlertController(
+            title: "Memory Options",
+            message: memory.title,
+            preferredStyle: .actionSheet
+        )
+        
+        // Always allow viewing details
+        alert.addAction(UIAlertAction(title: "View Details", style: .default) { [weak self] _ in
+            self?.showMemoryDetail(memory: memory)
+        })
+        
+        // Only show delete option if user is the owner
+        if isOwner {
+            alert.addAction(UIAlertAction(title: "Delete Memory", style: .destructive) { [weak self] _ in
+                self?.confirmDeleteMemory(memory: memory, at: indexPath)
+            })
+        }
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        // For iPad
+        if let popoverController = alert.popoverPresentationController {
+            popoverController.sourceView = postsCollectionView.cellForItem(at: indexPath)
+            popoverController.sourceRect = postsCollectionView.cellForItem(at: indexPath)?.bounds ?? CGRect.zero
+        }
+        
+        present(alert, animated: true)
+    }
+    
+    private func confirmDeleteMemory(memory: GroupMemory, at indexPath: IndexPath) {
+        let alert = UIAlertController(
+            title: "Delete Memory?",
+            message: "This will permanently delete '\(memory.title)' from the group. This action cannot be undone.",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
+            self?.deleteMemory(memory: memory, at: indexPath)
+        })
+        
+        present(alert, animated: true)
+    }
+    
+    private func deleteMemory(memory: GroupMemory, at indexPath: IndexPath) {
+        guard let memoryId = UUID(uuidString: memory.id) else {
+            showError(message: "Invalid memory ID")
+            return
+        }
+        
+        // Show loading
+        let loadingAlert = UIAlertController(title: "Deleting...", message: nil, preferredStyle: .alert)
+        present(loadingAlert, animated: true)
+        
+        Task {
+            do {
+                try await SupabaseManager.shared.deleteMemory(memoryId: memoryId)
+                
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        // Remove from local array
+                        self.memories.remove(at: indexPath.item)
+                        
+                        // Update collection view
+                        self.postsCollectionView.performBatchUpdates({
+                            self.postsCollectionView.deleteItems(at: [indexPath])
+                        }, completion: { _ in
+                            // Update empty state
+                            self.memoriesEmptyLabel.isHidden = !self.memories.isEmpty
+                            
+                            // Show success message
+                            let successAlert = UIAlertController(
+                                title: "Memory Deleted",
+                                message: "The memory has been successfully deleted.",
+                                preferredStyle: .alert
+                            )
+                            successAlert.addAction(UIAlertAction(title: "OK", style: .default))
+                            self.present(successAlert, animated: true)
+                        })
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    loadingAlert.dismiss(animated: true) {
+                        self.showError(message: "Failed to delete memory: \(error.localizedDescription)")
+                    }
+                }
+            }
         }
     }
     
@@ -232,9 +337,7 @@ class FamilyMemberViewController: UIViewController {
             message: message,
             preferredStyle: .alert
         )
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
-            self.navigationController?.popViewController(animated: true)
-        })
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
     }
     
@@ -304,12 +407,11 @@ extension FamilyMemberViewController: UICollectionViewDataSource, UICollectionVi
             let member = members[indexPath.item]
             
             // Configure with member data
-            // Note: You'll need to add a method to load profile images
-            // For now, using placeholder
-            cell.configure(
-                name: member.name,
-                image: UIImage(systemName: "person.circle.fill")?.withTintColor(.systemGray, renderingMode: .alwaysOriginal)
-            )
+            // Note: Since profiles table doesn't have profile pictures, we use a placeholder
+            // You could later add profile pictures by:
+            // 1. Adding an avatar_url column to profiles table
+            // 2. Fetching it here and loading the image
+            cell.configure(name: member.name)
             
             // Add admin badge if needed
             if member.isAdmin {
@@ -328,16 +430,7 @@ extension FamilyMemberViewController: UICollectionViewDataSource, UICollectionVi
         let memory = memories[indexPath.item]
         
         // Configure with memory data
-        cell.configure(
-            prompt: memory.title,
-            author: memory.userName ?? "Unknown",
-            image: nil  // Placeholder - you'll need to load actual images
-        )
-        
-        // Optional: Add content preview
-        if let content = memory.content, !content.isEmpty {
-            // You could add a subtitle or adjust the prompt label
-        }
+        cell.configure(memory: memory)
         
         return cell
     }
@@ -356,12 +449,10 @@ extension FamilyMemberViewController: UICollectionViewDataSource, UICollectionVi
             let memory = memories[indexPath.item]
             print("Tapped Memory: \(memory.title)")
             
-            // 🚨 CRITICAL FIX: Actually navigate to detail view
             showMemoryDetail(memory: memory)
         }
     }
 
-    // Add this method to show memory detail
     private func showMemoryDetail(memory: GroupMemory) {
         // Fetch media items for this memory
         Task {
@@ -388,7 +479,6 @@ extension FamilyMemberViewController: UICollectionViewDataSource, UICollectionVi
         }
     }
 
-    // Add this helper method
     private func fetchMediaForMemory(memoryId: String) async throws -> [SupabaseMemoryMedia] {
         let response = try await SupabaseManager.shared.client
             .from("memory_media")

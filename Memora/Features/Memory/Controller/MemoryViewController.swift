@@ -15,7 +15,7 @@ final class MemoryViewController: UIViewController {
     // MARK: - Scheduled Memories Outlets (UNCOMMENT AND CONNECT THESE IN XIB)
     @IBOutlet weak var scheduledContainerView: UIView!
     @IBOutlet weak var scheduledLabel: UILabel!
-    @IBOutlet weak var scheduledCollectionView: UICollectionView!  // UNCOMMENT THIS
+    @IBOutlet weak var scheduledCollectionView: UICollectionView!
     @IBOutlet weak var noScheduledMemoriesView: UIView!
 
     // MARK: - Config
@@ -252,11 +252,6 @@ final class MemoryViewController: UIViewController {
             if Bundle.main.path(forResource: "MemoryCategoryCollectionViewCell", ofType: "nib") != nil {
                 cv.register(UINib(nibName: "MemoryCategoryCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: categoryCellReuseId)
             }
-        } else if cv == scheduledCollectionView {
-            // CRITICAL CHANGE: Register MemoryCapsuleCell by CLASS, not XIB
-            // Since MemoryCapsuleCell is a programmatic SwiftUI wrapper
-            cv.register(MemoryCapsuleCell.self, forCellWithReuseIdentifier: capsuleCellReuseId)
-            print("✅ Registered MemoryCapsuleCell CLASS with identifier: \(capsuleCellReuseId)")
         } else {
             if Bundle.main.path(forResource: "MemoryCollectionViewCell", ofType: "nib") != nil {
                 cv.register(UINib(nibName: "MemoryCollectionViewCell", bundle: nil), forCellWithReuseIdentifier: memoryCellReuseId)
@@ -290,6 +285,12 @@ final class MemoryViewController: UIViewController {
         scheduledCollectionView.backgroundColor = .clear
         scheduledCollectionView.showsHorizontalScrollIndicator = false
         scheduledCollectionView.isHidden = false
+        
+        
+        scheduledCollectionView.register(
+            MemoryCapsuleCell.self,
+            forCellWithReuseIdentifier: capsuleCellReuseId
+        )
         
         // Configure layout if needed
         if let layout = scheduledCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
@@ -1249,89 +1250,3 @@ extension UIColor {
         )
     }
 }
-//
-//// MARK: - MemoryCapsuleCell (Create this class if you don't have it)
-//final class MemoryCapsuleCell: UICollectionViewCell {
-//    private let titleLabel = UILabel()
-//    private let dateLabel = UILabel()
-//    private let giftIcon = UIImageView()
-//    
-//    override init(frame: CGRect) {
-//        super.init(frame: frame)
-//        setup()
-//    }
-//    
-//    required init?(coder: NSCoder) {
-//        super.init(coder: coder)
-//        setup()
-//    }
-//    
-//    private func setup() {
-//        contentView.backgroundColor = UIColor(hex: "#5AC8FA").withAlphaComponent(0.1)
-//        contentView.layer.cornerRadius = 16
-//        contentView.layer.borderWidth = 2
-//        contentView.layer.borderColor = UIColor(hex: "#5AC8FA").cgColor
-//        contentView.clipsToBounds = true
-//        
-//        // Configure gift icon
-//        giftIcon.image = UIImage(systemName: "gift.fill")
-//        giftIcon.tintColor = UIColor(hex: "#5AC8FA")
-//        giftIcon.translatesAutoresizingMaskIntoConstraints = false
-//        contentView.addSubview(giftIcon)
-//        
-//        // Configure title label
-//        titleLabel.font = UIFont.systemFont(ofSize: 16, weight: .bold)
-//        titleLabel.textColor = .label
-//        titleLabel.textAlignment = .center
-//        titleLabel.numberOfLines = 2
-//        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-//        contentView.addSubview(titleLabel)
-//        
-//        // Configure date label
-//        dateLabel.font = UIFont.systemFont(ofSize: 12)
-//        dateLabel.textColor = .secondaryLabel
-//        dateLabel.textAlignment = .center
-//        dateLabel.translatesAutoresizingMaskIntoConstraints = false
-//        contentView.addSubview(dateLabel)
-//        
-//        // Constraints
-//        NSLayoutConstraint.activate([
-//            giftIcon.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-//            giftIcon.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 30),
-//            giftIcon.widthAnchor.constraint(equalToConstant: 50),
-//            giftIcon.heightAnchor.constraint(equalToConstant: 50),
-//            
-//            titleLabel.topAnchor.constraint(equalTo: giftIcon.bottomAnchor, constant: 20),
-//            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-//            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
-//            
-//            dateLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
-//            dateLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-//            dateLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12)
-//        ])
-//    }
-//    
-//    func configure(with memory: SupabaseMemory) {
-//        titleLabel.text = memory.title
-//        
-//        if let releaseDate = memory.releaseAt {
-//            let formatter = DateFormatter()
-//            formatter.dateStyle = .medium
-//            formatter.timeStyle = .short
-//            dateLabel.text = "Unlocks: \(formatter.string(from: releaseDate))"
-//            
-//            // Highlight if ready to open
-//            if releaseDate <= Date() {
-//                dateLabel.text = "Ready to open! 🎁"
-//                dateLabel.textColor = .systemGreen
-//                contentView.backgroundColor = UIColor(hex: "#5AC8FA").withAlphaComponent(0.3)
-//            } else {
-//                dateLabel.textColor = .secondaryLabel
-//                contentView.backgroundColor = UIColor(hex: "#5AC8FA").withAlphaComponent(0.1)
-//            }
-//        } else {
-//            dateLabel.text = "No release date"
-//            dateLabel.textColor = .secondaryLabel
-//        }
-//    }
-//}

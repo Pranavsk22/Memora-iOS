@@ -11,7 +11,7 @@
         <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner" customClass="MemoryViewController" customModule="Home">
             <connections>
                 <outlet property="categoriesCollectionView" destination="Lpo-7M-CT9" id="BjU-xd-vUe"/>
-                <outlet property="noScheduledMemoriesView" destination="Kes-bs-T10" id="gjy-uj-85I"/>
+                <outlet property="noScheduledMemoriesView" destination="X8B-1h-nij" id="td6-PT-fl5"/>
                 <outlet property="premiumCardView" destination="Qdr-Sv-6fx" id="oeV-5e-NP1"/>
                 <outlet property="privateCollectionView" destination="9Mj-BA-xKv" id="ATz-QC-gjx"/>
                 <outlet property="recentsCollectionView" destination="CCD-bV-Z04" id="PBr-Ho-GzJ"/>
@@ -33,7 +33,7 @@
                     <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
                     <subviews>
                         <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="f78-nL-Hgk">
-                            <rect key="frame" x="0.0" y="0.0" width="393" height="1280"/>
+                            <rect key="frame" x="0.0" y="0.0" width="393" height="1380"/>
                             <subviews>
                                 <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Recents" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="QNQ-PX-vLi">
                                     <rect key="frame" x="16" y="8" width="95.666666666666671" height="29"/>
@@ -150,10 +150,10 @@
                                     </collectionViewFlowLayout>
                                 </collectionView>
                                 <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Kes-bs-T10">
-                                    <rect key="frame" x="16" y="1080" width="361" height="200"/>
+                                    <rect key="frame" x="16" y="1080" width="361" height="300"/>
                                     <subviews>
                                         <collectionView clipsSubviews="YES" multipleTouchEnabled="YES" contentMode="scaleToFill" dataMode="none" translatesAutoresizingMaskIntoConstraints="NO" id="9tx-27-Q2s">
-                                            <rect key="frame" x="16" y="36" width="329" height="128"/>
+                                            <rect key="frame" x="16" y="36" width="329" height="228"/>
                                             <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                                             <collectionViewFlowLayout key="collectionViewLayout" minimumLineSpacing="10" minimumInteritemSpacing="10" id="0u9-QX-TfN">
                                                 <size key="itemSize" width="128" height="128"/>
@@ -168,7 +168,7 @@
                                         <constraint firstItem="9tx-27-Q2s" firstAttribute="leading" secondItem="Kes-bs-T10" secondAttribute="leading" constant="16" id="1mE-tr-n3V"/>
                                         <constraint firstItem="9tx-27-Q2s" firstAttribute="centerX" secondItem="Kes-bs-T10" secondAttribute="centerX" id="TTr-fn-uEe"/>
                                         <constraint firstItem="9tx-27-Q2s" firstAttribute="centerY" secondItem="Kes-bs-T10" secondAttribute="centerY" id="fbc-FF-a8a"/>
-                                        <constraint firstAttribute="height" constant="200" id="lBC-dO-NFH"/>
+                                        <constraint firstAttribute="height" constant="300" id="lBC-dO-NFH"/>
                                         <constraint firstItem="9tx-27-Q2s" firstAttribute="top" secondItem="Kes-bs-T10" secondAttribute="top" constant="36" id="u5q-PY-bl3"/>
                                     </constraints>
                                 </view>
@@ -248,11 +248,21 @@
                                 <constraint firstAttribute="bottom" secondItem="Kes-bs-T10" secondAttribute="bottom" id="y83-sT-8uh"/>
                             </constraints>
                         </view>
+                        <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="X8B-1h-nij">
+                            <rect key="frame" x="16" y="1410" width="361" height="200"/>
+                            <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                            <constraints>
+                                <constraint firstAttribute="height" constant="200" id="bKt-NT-evY"/>
+                            </constraints>
+                        </view>
                     </subviews>
                     <constraints>
+                        <constraint firstItem="ses-EG-gXP" firstAttribute="trailing" secondItem="X8B-1h-nij" secondAttribute="trailing" constant="16" id="25V-IL-RVG"/>
                         <constraint firstItem="f78-nL-Hgk" firstAttribute="bottom" secondItem="eZu-3k-y1e" secondAttribute="bottom" constant="-200" id="9Dg-D0-Sct"/>
                         <constraint firstItem="f78-nL-Hgk" firstAttribute="top" secondItem="eZu-3k-y1e" secondAttribute="top" id="cDP-F0-Twk"/>
                         <constraint firstItem="f78-nL-Hgk" firstAttribute="trailing" secondItem="eZu-3k-y1e" secondAttribute="trailing" id="rHX-Aw-NAt"/>
+                        <constraint firstItem="X8B-1h-nij" firstAttribute="leading" secondItem="ses-EG-gXP" secondAttribute="leading" constant="16" id="uwR-b4-nUq"/>
+                        <constraint firstItem="X8B-1h-nij" firstAttribute="top" secondItem="f78-nL-Hgk" secondAttribute="bottom" constant="30" id="wa3-li-VQj"/>
                         <constraint firstItem="f78-nL-Hgk" firstAttribute="width" secondItem="ses-EG-gXP" secondAttribute="width" id="xuz-c3-QYf"/>
                         <constraint firstItem="f78-nL-Hgk" firstAttribute="leading" secondItem="eZu-3k-y1e" secondAttribute="leading" id="znT-Ps-hsC"/>
                     </constraints>
