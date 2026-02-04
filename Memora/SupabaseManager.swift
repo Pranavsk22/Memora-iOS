@@ -2554,4 +2554,60 @@ extension SupabaseManager {
         
         print("DEBUG: Memory \(memoryId) deleted successfully")
     }
+    
+    
+    // Add this method to UNshare from a specific group (not delete memory)
+    func unshareMemoryFromGroup(memoryId: UUID, groupId: UUID) async throws {
+        print("DEBUG: Unsharing memory \(memoryId) from group \(groupId)")
+        
+        // Remove from group_memories
+        try await client
+            .from("group_memories")
+            .delete()
+            .eq("memory_id", value: memoryId.uuidString)
+            .eq("group_id", value: groupId.uuidString)
+            .execute()
+        
+        // Remove from memory_group_access
+        try await client
+            .from("memory_group_access")
+            .delete()
+            .eq("memory_id", value: memoryId.uuidString)
+            .eq("group_id", value: groupId.uuidString)
+            .execute()
+        
+        print("DEBUG: Memory unshared from group")
+    }
+
+    // Add this method to share with multiple groups
+    func shareMemoryWithGroups(memoryId: UUID, groupIds: [UUID]) async throws {
+        for groupId in groupIds {
+            try await shareMemoryWithGroup(memoryId: memoryId, groupId: groupId)
+        }
+    }
+
+    // Add this method to get groups this memory is already shared with
+    func getGroupsForMemory(memoryId: UUID) async throws -> [UserGroup] {
+        let response = try await client
+            .from("group_memories")
+            .select("""
+                groups!inner (
+                    id,
+                    name,
+                    code,
+                    created_by,
+                    admin_id,
+                    created_at
+                )
+            """)
+            .eq("memory_id", value: memoryId.uuidString)
+            .execute()
+        
+        struct GroupMemoryResponse: Decodable {
+            let groups: UserGroup
+        }
+        
+        let responses = try jsonDecoder.decode([GroupMemoryResponse].self, from: response.data)
+        return responses.map { $0.groups }
+    }
 }
