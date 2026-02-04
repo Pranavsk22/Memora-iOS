@@ -247,7 +247,7 @@ final class PostOptionsViewController: UIViewController {
     // Group selection
     private let groupSelectionStack = UIStackView()
     private let groupSelectionButton = UIButton(type: .system)
-    private var selectedGroup: UserGroup?
+    private var selectedGroups: [UserGroup] = []
     private var userGroups: [UserGroup] = []
     private var groupSelectionVisible: Bool = false
 
@@ -578,20 +578,20 @@ final class PostOptionsViewController: UIViewController {
         alert.addAction(UIAlertAction(title: PostVisibility.everyone.title, style: .default, handler: { _ in
             self.selectedVisibility = .everyone
             self.scheduleChosen = false
-            self.selectedGroup = nil
+            self.selectedGroups = []
             self.updateGroupSelectionButtonTitle()
             self.updatePostButtonState()
         }))
         alert.addAction(UIAlertAction(title: PostVisibility.private.title, style: .default, handler: { _ in
             self.selectedVisibility = .private
             self.scheduleChosen = false
-            self.selectedGroup = nil
+            self.selectedGroups = []
             self.updateGroupSelectionButtonTitle()
             self.updatePostButtonState()
         }))
         alert.addAction(UIAlertAction(title: PostVisibility.scheduledPost.title, style: .default, handler: { _ in
             self.selectedVisibility = .scheduledPost
-            self.selectedGroup = nil
+            self.selectedGroups = []  // Changed from selectedGroups = nil
             self.updateGroupSelectionButtonTitle()
             self.presentScheduleDatePicker()
         }))
@@ -613,41 +613,25 @@ final class PostOptionsViewController: UIViewController {
     }
 
     @objc private func groupSelectionTapped() {
-        guard !userGroups.isEmpty else {
-            showAlert(title: "No Groups", message: "You don't have any groups yet. Create or join a group first.")
-            return
+        let vc = MultipleGroupsSelectionViewController()
+        vc.userGroups = userGroups
+        vc.selectedGroups = selectedGroups
+        vc.onSelectionComplete = { [weak self] selected in
+            self?.selectedGroups = selected
+            self?.updateGroupSelectionButtonTitle()
+            self?.updatePostButtonState()
         }
-
-        let alert = UIAlertController(title: "Select Group", message: nil, preferredStyle: .actionSheet)
-        
-        for group in userGroups {
-            let isSelected = selectedGroup?.id == group.id
-            let title = isSelected ? "✓ \(group.name)" : group.name
-            
-            alert.addAction(UIAlertAction(title: title, style: .default, handler: { _ in
-                self.selectedGroup = group
-                self.updateGroupSelectionButtonTitle()
-                self.updatePostButtonState()
-            }))
-        }
-        
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-        
-        if let p = alert.popoverPresentationController {
-            p.sourceView = groupSelectionButton
-            p.sourceRect = groupSelectionButton.bounds
-        }
-        
-        present(alert, animated: true)
+        present(vc, animated: true)
     }
-
+    
     private func updateGroupSelectionButtonTitle() {
-        if let group = selectedGroup {
-            groupSelectionButton.setTitle("Selected: \(group.name)", for: .normal)
-            groupSelectionButton.setTitleColor(.systemBlue, for: .normal)
-        } else {
-            groupSelectionButton.setTitle("Tap to select group", for: .normal)
+        if selectedGroups.isEmpty {
+            groupSelectionButton.setTitle("Tap to select groups", for: .normal)
             groupSelectionButton.setTitleColor(.secondaryLabel, for: .normal)
+        } else {
+            let count = selectedGroups.count
+            groupSelectionButton.setTitle("Selected: \(count) group\(count == 1 ? "" : "s")", for: .normal)
+            groupSelectionButton.setTitleColor(.systemBlue, for: .normal)
         }
     }
 
@@ -772,14 +756,14 @@ final class PostOptionsViewController: UIViewController {
             return
         }
 
-        if selectedVisibility == .group && selectedGroup == nil {
+        if selectedVisibility == .group && selectedGroups.isEmpty {
             showValidationError("Please select a group to share with.")
             return
         }
 
         let visibility = selectedVisibility.asMemoryVisibility
         let scheduleDate = selectedVisibility == .scheduledPost ? selectedScheduleDate : nil
-        let selectedGroupId = selectedGroup
+        let selectedGroupId = selectedGroups
 
         if SupabaseManager.shared.isUserLoggedIn() {
             postToSupabaseWithSchedule(
@@ -787,7 +771,7 @@ final class PostOptionsViewController: UIViewController {
                 year: Int(yearText) ?? 2024,
                 visibility: visibility,
                 scheduleDate: scheduleDate,
-                group: selectedGroupId
+                groups: selectedGroupId
             )
         } else if let d = delegate {
             d.postOptionsViewController(self, didFinishPostingWithTitle: titleText, scheduleDate: scheduleDate, visibility: visibility)
@@ -806,7 +790,7 @@ final class PostOptionsViewController: UIViewController {
         year: Int,
         visibility: MemoryVisibility,
         scheduleDate: Date?,
-        group: UserGroup?
+        groups: [UserGroup]  // Parameter named 'groups'
     ) {
         showSavingOverlay()
         setControlsEnabled(false)
@@ -816,7 +800,7 @@ final class PostOptionsViewController: UIViewController {
         print("  Year: \(year)")
         print("  Visibility: \(visibility)")
         print("  Schedule Date: \(scheduleDate?.description ?? "None")")
-        print("  Group: \(group?.name ?? "None")")
+        print("  Groups: \(groups.count) groups")
         
         Task {
             do {
@@ -856,9 +840,10 @@ final class PostOptionsViewController: UIViewController {
                 }
                 
                 let memory: SupabaseMemory
-                
-                if let group = group, visibility == .group, let groupId = UUID(uuidString: group.id) {
-                    print("DEBUG: Creating group-specific memory for group: \(group.name)")
+
+                // FIX 1: Change 'selectedGroups' to 'groups' (the parameter)
+                if !groups.isEmpty, visibility == .group {
+                    let groupIds = groups.compactMap { UUID(uuidString: $0.id) }  // Use 'groups' parameter
                     
                     memory = try await SupabaseManager.shared.createMemory(
                         title: title,
@@ -870,15 +855,10 @@ final class PostOptionsViewController: UIViewController {
                         textContent: bodyText
                     )
                     
-                    print("DEBUG: Memory created, now sharing with group...")
-                    
-                    try await SupabaseManager.shared.shareMemoryWithGroup(
+                    try await SupabaseManager.shared.shareMemoryWithGroups(
                         memoryId: memory.id,
-                        groupId: groupId
+                        groupIds: groupIds
                     )
-                    
-                    print("DEBUG: Group sharing completed")
-                    
                 } else {
                     print("DEBUG: Creating regular memory")
                     memory = try await SupabaseManager.shared.createMemory(
@@ -891,15 +871,16 @@ final class PostOptionsViewController: UIViewController {
                         textContent: bodyText
                     )
                     
-                    print("DEBUG: Regular memory created successfully")
-                    
-                    if let group = group, let groupId = UUID(uuidString: group.id) {
-                        print("DEBUG: Sharing regular memory with group: \(group.name)")
-                        try await SupabaseManager.shared.shareMemoryWithGroup(
-                            memoryId: memory.id,
-                            groupId: groupId
-                        )
-                    }
+                    // FIX 2: Remove this block since we're using 'groups' parameter now
+                    // This old code is trying to use a variable 'group' that doesn't exist
+                    // Delete lines 875-882:
+                    // if let group = group, let groupId = UUID(uuidString: group.id) {
+                    //     print("DEBUG: Sharing regular memory with group: \(group.name)")
+                    //     try await SupabaseManager.shared.shareMemoryWithGroup(
+                    //         memoryId: memory.id,
+                    //         groupId: groupId
+                    //     )
+                    // }
                 }
                 
                 DispatchQueue.main.async {
@@ -907,8 +888,9 @@ final class PostOptionsViewController: UIViewController {
                     self.setControlsEnabled(true)
                     
                     let message: String
-                    if group != nil {
-                        message = "Memory shared with \(group!.name) group!"
+                    if !groups.isEmpty {  // Use 'groups' parameter
+                        let groupNames = groups.map { $0.name }.joined(separator: ", ")
+                        message = "Memory shared with \(groups.count) group\(groups.count == 1 ? "" : "s")!"
                     } else {
                         message = "Memory posted successfully!"
                     }
@@ -1092,7 +1074,7 @@ final class PostOptionsViewController: UIViewController {
             case .scheduledPost:
                 return scheduleChosen
             case .group:
-                return selectedGroup != nil
+                return !selectedGroups.isEmpty
             default:
                 return true
             }

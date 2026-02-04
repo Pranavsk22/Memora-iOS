@@ -158,9 +158,13 @@ class FamilyMemberViewController: UIViewController {
             preferredStyle: .actionSheet
         )
         
-        // Always allow viewing details
         alert.addAction(UIAlertAction(title: "View Details", style: .default) { [weak self] _ in
             self?.showMemoryDetail(memory: memory)
+        })
+        
+        // Add "Share with more groups" option
+        alert.addAction(UIAlertAction(title: "Share with more groups", style: .default) { [weak self] _ in
+            self?.showShareWithGroups(memory: memory)
         })
         
         // Only show delete option if user is the owner
@@ -179,6 +183,62 @@ class FamilyMemberViewController: UIViewController {
         }
         
         present(alert, animated: true)
+    }
+
+    private func showShareWithGroups(memory: GroupMemory) {
+        guard let memoryId = UUID(uuidString: memory.id) else { return }
+        
+        Task {
+            do {
+                // Get user's groups and groups already shared with
+                let userGroups = try await SupabaseManager.shared.getMyGroups()
+                let alreadySharedGroups = try await SupabaseManager.shared.getGroupsForMemory(memoryId: memoryId)
+                
+                DispatchQueue.main.async {
+                    let vc = MultipleGroupsSelectionViewController()
+                    vc.userGroups = userGroups
+                    vc.selectedGroups = alreadySharedGroups
+                    vc.onSelectionComplete = { [weak self] selectedGroups in
+                        self?.shareMemoryWithAdditionalGroups(memoryId: memoryId, selectedGroups: selectedGroups)
+                    }
+                    let nav = UINavigationController(rootViewController: vc)
+                    self.present(nav, animated: true)
+                }
+            } catch {
+                print("Error fetching groups: \(error)")
+            }
+        }
+    }
+    
+    private func showSuccessMessage(_ message: String) {
+        let alert = UIAlertController(
+            title: "Success",
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+
+    private func shareMemoryWithAdditionalGroups(memoryId: UUID, selectedGroups: [UserGroup]) {
+        let groupIds = selectedGroups.compactMap { UUID(uuidString: $0.id) }
+        
+        Task {
+            do {
+                try await SupabaseManager.shared.shareMemoryWithGroups(
+                    memoryId: memoryId,
+                    groupIds: groupIds
+                )
+                
+                DispatchQueue.main.async {
+                    self.showSuccessMessage("Memory shared with selected groups")
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.showError(message: "Failed to share memory: \(error.localizedDescription)")
+                }
+            }
+        }
     }
     
     private func confirmDeleteMemory(memory: GroupMemory, at indexPath: IndexPath) {
