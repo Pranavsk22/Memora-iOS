@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24506" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
     <device id="retina6_12" orientation="portrait" appearance="light"/>
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="System colors in document resources" minToolsVersion="11.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
@@ -40,16 +40,16 @@
                             <nil key="highlightedColor"/>
                         </label>
                         <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Y78-ts-zFm">
-                            <rect key="frame" x="20" y="78" width="353" height="40"/>
+                            <rect key="frame" x="20" y="78" width="353" height="50"/>
                             <subviews>
                                 <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Daily Reminder" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="bY4-P1-6tw">
-                                    <rect key="frame" x="16" y="9.6666666666666572" width="120" height="21"/>
+                                    <rect key="frame" x="16" y="14.666666666666657" width="120" height="21"/>
                                     <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="17"/>
                                     <nil key="textColor"/>
                                     <nil key="highlightedColor"/>
                                 </label>
                                 <switch opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="750" verticalHuggingPriority="750" contentHorizontalAlignment="center" contentVerticalAlignment="center" on="YES" translatesAutoresizingMaskIntoConstraints="NO" id="VyO-yw-jVm">
-                                    <rect key="frame" x="284" y="6" width="63" height="28"/>
+                                    <rect key="frame" x="284" y="11" width="63" height="28"/>
                                 </switch>
                             </subviews>
                             <color key="backgroundColor" systemColor="systemBackgroundColor"/>
@@ -58,33 +58,33 @@
                                 <constraint firstAttribute="trailing" secondItem="VyO-yw-jVm" secondAttribute="trailing" constant="8" id="ShA-5y-VJP"/>
                                 <constraint firstItem="bY4-P1-6tw" firstAttribute="centerY" secondItem="Y78-ts-zFm" secondAttribute="centerY" id="hiI-b4-npi"/>
                                 <constraint firstItem="VyO-yw-jVm" firstAttribute="centerY" secondItem="bY4-P1-6tw" secondAttribute="centerY" id="iDY-Dy-flu"/>
-                                <constraint firstAttribute="height" constant="40" id="xsg-P6-P5l"/>
+                                <constraint firstAttribute="height" constant="50" id="xsg-P6-P5l"/>
                             </constraints>
                         </view>
                         <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="rhN-76-4yb">
-                            <rect key="frame" x="20" y="203" width="353" height="40"/>
+                            <rect key="frame" x="20" y="213" width="353" height="50"/>
                             <subviews>
                                 <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Family Posts" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="hGA-iS-3gI">
-                                    <rect key="frame" x="16" y="9.6666666666666856" width="100" height="21"/>
+                                    <rect key="frame" x="16" y="14.666666666666686" width="100" height="21"/>
                                     <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="17"/>
                                     <nil key="textColor"/>
                                     <nil key="highlightedColor"/>
                                 </label>
                                 <switch opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="750" verticalHuggingPriority="750" contentHorizontalAlignment="center" contentVerticalAlignment="center" on="YES" translatesAutoresizingMaskIntoConstraints="NO" id="fKs-PJ-vyV">
-                                    <rect key="frame" x="284" y="6" width="63" height="28"/>
+                                    <rect key="frame" x="284" y="11" width="63" height="28"/>
                                 </switch>
                             </subviews>
                             <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                             <constraints>
                                 <constraint firstItem="hGA-iS-3gI" firstAttribute="leading" secondItem="rhN-76-4yb" secondAttribute="leading" constant="16" id="9c1-VP-kmT"/>
-                                <constraint firstAttribute="height" constant="40" id="ets-UP-f0a"/>
+                                <constraint firstAttribute="height" constant="50" id="ets-UP-f0a"/>
                                 <constraint firstItem="fKs-PJ-vyV" firstAttribute="centerY" secondItem="hGA-iS-3gI" secondAttribute="centerY" id="nqR-ft-Led"/>
                                 <constraint firstItem="hGA-iS-3gI" firstAttribute="centerY" secondItem="rhN-76-4yb" secondAttribute="centerY" id="uhK-hw-3ME"/>
                                 <constraint firstAttribute="trailing" secondItem="fKs-PJ-vyV" secondAttribute="trailing" constant="8" id="xyM-zq-sps"/>
                             </constraints>
                         </view>
                         <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Get notifications that will inspire you to store your memories on the daily basis" lineBreakMode="tailTruncation" numberOfLines="2" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="OW3-yJ-ufY">
-                            <rect key="frame" x="20" y="123" width="353" height="60"/>
+                            <rect key="frame" x="20" y="133" width="353" height="60"/>
                             <constraints>
                                 <constraint firstAttribute="height" constant="60" id="UJ7-Fw-OfX"/>
                             </constraints>
@@ -93,7 +93,7 @@
                             <nil key="highlightedColor"/>
                         </label>
                         <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Receive a notification every time when your family member post a new memory " lineBreakMode="tailTruncation" numberOfLines="2" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="4zk-vU-h2T">
-                            <rect key="frame" x="20" y="248" width="353" height="60"/>
+                            <rect key="frame" x="20" y="268" width="353" height="60"/>
                             <constraints>
                                 <constraint firstAttribute="height" constant="60" id="5TY-dI-W7P"/>
                             </constraints>
@@ -102,7 +102,7 @@
                             <nil key="highlightedColor"/>
                         </label>
                         <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Receive a notification every time when your family member react on your post" lineBreakMode="tailTruncation" numberOfLines="2" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="YKZ-Vd-CTA">
-                            <rect key="frame" x="20" y="373" width="353" height="60"/>
+                            <rect key="frame" x="20" y="403" width="353" height="60"/>
                             <constraints>
                                 <constraint firstAttribute="height" constant="60" id="6U2-IZ-w6w"/>
                             </constraints>
@@ -111,16 +111,16 @@
                             <nil key="highlightedColor"/>
                         </label>
                         <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="OpU-aP-g2Y">
-                            <rect key="frame" x="20" y="328" width="353" height="40"/>
+                            <rect key="frame" x="20" y="348" width="353" height="50"/>
                             <subviews>
                                 <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Family Reactions" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="KeX-5m-W5Y">
-                                    <rect key="frame" x="16" y="9.6666666666666856" width="134.33333333333334" height="21"/>
+                                    <rect key="frame" x="16" y="14.666666666666686" width="134.33333333333334" height="21"/>
                                     <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="17"/>
                                     <nil key="textColor"/>
                                     <nil key="highlightedColor"/>
                                 </label>
                                 <switch opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="750" verticalHuggingPriority="750" contentHorizontalAlignment="center" contentVerticalAlignment="center" on="YES" translatesAutoresizingMaskIntoConstraints="NO" id="rV4-t4-nwd">
-                                    <rect key="frame" x="284" y="6" width="63" height="28"/>
+                                    <rect key="frame" x="284" y="11" width="63" height="28"/>
                                 </switch>
                             </subviews>
                             <color key="backgroundColor" systemColor="systemBackgroundColor"/>
@@ -129,7 +129,7 @@
                                 <constraint firstAttribute="trailing" secondItem="rV4-t4-nwd" secondAttribute="trailing" constant="8" id="8i5-2G-Hvo"/>
                                 <constraint firstItem="KeX-5m-W5Y" firstAttribute="leading" secondItem="OpU-aP-g2Y" secondAttribute="leading" constant="16" id="UD1-YK-Kzj"/>
                                 <constraint firstItem="KeX-5m-W5Y" firstAttribute="centerY" secondItem="OpU-aP-g2Y" secondAttribute="centerY" id="mO2-Oy-2YQ"/>
-                                <constraint firstAttribute="height" constant="40" id="oZd-GT-U2s"/>
+                                <constraint firstAttribute="height" constant="50" id="oZd-GT-U2s"/>
                             </constraints>
                         </view>
                     </subviews>

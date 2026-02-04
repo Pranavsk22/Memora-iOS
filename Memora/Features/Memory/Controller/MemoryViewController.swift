@@ -2,7 +2,7 @@ import UIKit
 import SwiftUI
 import UserNotifications
 
-final class MemoryViewController: UIViewController {
+final class MemoryViewController: UIViewController, UIGestureRecognizerDelegate {
 
     // MARK: - IBOutlets
     @IBOutlet weak var recentsCollectionView: UICollectionView!
@@ -73,6 +73,7 @@ final class MemoryViewController: UIViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
+        view.backgroundColor = .systemGroupedBackground
         
         print("=== DEBUG: MemoryViewController Outlets ===")
         print("scheduledContainerView: \(scheduledContainerView != nil)")
@@ -80,8 +81,6 @@ final class MemoryViewController: UIViewController {
         print("scheduledLabel: \(scheduledLabel != nil)")
         print("noScheduledMemoriesView: \(noScheduledMemoriesView != nil)")
         
-        
-        setupNavigationBar()
         setupPremiumCardTap()
 
         // Configure collection views
@@ -122,6 +121,10 @@ final class MemoryViewController: UIViewController {
         
         // Start countdown timer
         startCountdownTimer()
+
+        // Enable interactive pop gesture recognizer for navigation controller (like HomeViewController)
+        navigationController?.interactivePopGestureRecognizer?.delegate = self
+        navigationController?.interactivePopGestureRecognizer?.isEnabled = true
     }
     
     
@@ -174,33 +177,14 @@ final class MemoryViewController: UIViewController {
         print("Superview constraints: \(scheduledCollectionView.superview?.constraints ?? [])")
     }
 
-    private func setupNavigationBar() {
-        self.title = "Memories"
-        navigationController?.navigationBar.prefersLargeTitles = true
-
-        if #available(iOS 13.0, *) {
-            let appearance = UINavigationBarAppearance()
-            appearance.configureWithDefaultBackground()
-            appearance.largeTitleTextAttributes = [
-                .font: UIFont.systemFont(ofSize: 34, weight: .heavy),
-                .foregroundColor: UIColor.label
-            ]
-            navigationController?.navigationBar.standardAppearance = appearance
-            navigationController?.navigationBar.scrollEdgeAppearance = appearance
-        }
-    }
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        navigationController?.navigationBar.prefersLargeTitles = true
-        navigationItem.largeTitleDisplayMode = .always
-        
         loadScheduledMemories()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
-        navigationController?.navigationBar.prefersLargeTitles = false
     }
     
     override func viewDidDisappear(_ animated: Bool) {
@@ -903,9 +887,12 @@ final class MemoryViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
     }
+    
+    // UIGestureRecognizerDelegate - allow interactive pop only when view controllers > 1
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        return (navigationController?.viewControllers.count ?? 0) > 1
+    }
 }
-
-// MARK: - UICollectionViewDataSource & Delegate
 extension MemoryViewController: UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
 
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
@@ -1255,30 +1242,30 @@ extension UIColor {
 //    private let titleLabel = UILabel()
 //    private let dateLabel = UILabel()
 //    private let giftIcon = UIImageView()
-//    
+//
 //    override init(frame: CGRect) {
 //        super.init(frame: frame)
 //        setup()
 //    }
-//    
+//
 //    required init?(coder: NSCoder) {
 //        super.init(coder: coder)
 //        setup()
 //    }
-//    
+//
 //    private func setup() {
 //        contentView.backgroundColor = UIColor(hex: "#5AC8FA").withAlphaComponent(0.1)
 //        contentView.layer.cornerRadius = 16
 //        contentView.layer.borderWidth = 2
 //        contentView.layer.borderColor = UIColor(hex: "#5AC8FA").cgColor
 //        contentView.clipsToBounds = true
-//        
+//
 //        // Configure gift icon
 //        giftIcon.image = UIImage(systemName: "gift.fill")
 //        giftIcon.tintColor = UIColor(hex: "#5AC8FA")
 //        giftIcon.translatesAutoresizingMaskIntoConstraints = false
 //        contentView.addSubview(giftIcon)
-//        
+//
 //        // Configure title label
 //        titleLabel.font = UIFont.systemFont(ofSize: 16, weight: .bold)
 //        titleLabel.textColor = .label
@@ -1286,40 +1273,40 @@ extension UIColor {
 //        titleLabel.numberOfLines = 2
 //        titleLabel.translatesAutoresizingMaskIntoConstraints = false
 //        contentView.addSubview(titleLabel)
-//        
+//
 //        // Configure date label
 //        dateLabel.font = UIFont.systemFont(ofSize: 12)
 //        dateLabel.textColor = .secondaryLabel
 //        dateLabel.textAlignment = .center
 //        dateLabel.translatesAutoresizingMaskIntoConstraints = false
 //        contentView.addSubview(dateLabel)
-//        
+//
 //        // Constraints
 //        NSLayoutConstraint.activate([
 //            giftIcon.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
 //            giftIcon.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 30),
 //            giftIcon.widthAnchor.constraint(equalToConstant: 50),
 //            giftIcon.heightAnchor.constraint(equalToConstant: 50),
-//            
+//
 //            titleLabel.topAnchor.constraint(equalTo: giftIcon.bottomAnchor, constant: 20),
 //            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
 //            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
-//            
+//
 //            dateLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
 //            dateLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
 //            dateLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12)
 //        ])
 //    }
-//    
+//
 //    func configure(with memory: SupabaseMemory) {
 //        titleLabel.text = memory.title
-//        
+//
 //        if let releaseDate = memory.releaseAt {
 //            let formatter = DateFormatter()
 //            formatter.dateStyle = .medium
 //            formatter.timeStyle = .short
 //            dateLabel.text = "Unlocks: \(formatter.string(from: releaseDate))"
-//            
+//
 //            // Highlight if ready to open
 //            if releaseDate <= Date() {
 //                dateLabel.text = "Ready to open! 🎁"
@@ -1335,3 +1322,4 @@ extension UIColor {
 //        }
 //    }
 //}
+

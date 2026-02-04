@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24506" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
     <device id="retina6_12" orientation="portrait" appearance="light"/>
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
         <capability name="Named colors" minToolsVersion="9.0"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="System colors in document resources" minToolsVersion="11.0"/>
@@ -31,16 +31,16 @@
                             <nil key="highlightedColor"/>
                         </label>
                         <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="O53-tb-uwV">
-                            <rect key="frame" x="20" y="46" width="353" height="60"/>
+                            <rect key="frame" x="20" y="46" width="353" height="50"/>
                             <subviews>
                                 <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Phone" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="NBw-hs-hN5">
-                                    <rect key="frame" x="10" y="19.666666666666657" width="49" height="21"/>
+                                    <rect key="frame" x="10" y="14.666666666666657" width="49" height="21"/>
                                     <fontDescription key="fontDescription" type="system" pointSize="17"/>
                                     <nil key="textColor"/>
                                     <nil key="highlightedColor"/>
                                 </label>
                                 <textField opaque="NO" contentMode="scaleToFill" horizontalHuggingPriority="248" contentHorizontalAlignment="left" contentVerticalAlignment="center" placeholder="8940130927" minimumFontSize="17" translatesAutoresizingMaskIntoConstraints="NO" id="vPw-19-Y8T">
-                                    <rect key="frame" x="259.33333333333331" y="19" width="83.666666666666686" height="22"/>
+                                    <rect key="frame" x="259.33333333333331" y="14" width="83.666666666666686" height="22"/>
                                     <color key="textColor" name="AccentColor"/>
                                     <fontDescription key="fontDescription" type="system" pointSize="14"/>
                                     <textInputTraits key="textInputTraits"/>
@@ -52,7 +52,7 @@
                                 <constraint firstItem="NBw-hs-hN5" firstAttribute="centerY" secondItem="O53-tb-uwV" secondAttribute="centerY" id="EYA-gK-TmM"/>
                                 <constraint firstItem="NBw-hs-hN5" firstAttribute="leading" secondItem="O53-tb-uwV" secondAttribute="leading" constant="10" id="MEv-Vy-SKQ"/>
                                 <constraint firstItem="vPw-19-Y8T" firstAttribute="centerY" secondItem="O53-tb-uwV" secondAttribute="centerY" id="OYw-Jr-VE8"/>
-                                <constraint firstAttribute="height" constant="60" id="dGw-2s-Pdn"/>
+                                <constraint firstAttribute="height" constant="50" id="dGw-2s-Pdn"/>
                             </constraints>
                         </view>
                     </subviews>
@@ -79,7 +79,7 @@
     </objects>
     <resources>
         <namedColor name="AccentColor">
-            <color red="0.0" green="0.46000000000000002" blue="0.89000000000000001" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
+            <color red="1" green="0.79199999570846558" blue="0.15700000524520874" alpha="1" colorSpace="custom" customColorSpace="sRGB"/>
         </namedColor>
         <systemColor name="systemBackgroundColor">
             <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>

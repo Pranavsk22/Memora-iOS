@@ -21,9 +21,15 @@ class GroupsTableViewCell: UITableViewCell {
         
         backgroundColor = .clear
         selectionStyle = .none
-        
-        containerView.layer.cornerRadius = 22
-        containerView.backgroundColor = .white
+
+        // Container styling
+        containerView.layer.cornerRadius = 18
+        containerView.backgroundColor = .secondarySystemBackground
+        containerView.layer.shadowColor = UIColor.black.cgColor
+        containerView.layer.shadowOpacity = 0.08
+        containerView.layer.shadowRadius = 12
+        containerView.layer.shadowOffset = CGSize(width: 0, height: 6)
+        containerView.layer.masksToBounds = false
         
 //        groupImageView.layer.cornerRadius = 24
 //        groupImageView.clipsToBounds = true
@@ -34,6 +40,12 @@ class GroupsTableViewCell: UITableViewCell {
         adminLabel.textColor = .systemBlue
         adminLabel.font = .systemFont(ofSize: 11, weight: .semibold)
         adminBadge.isHidden = true
+        
+        // Labels styling
+        titleLabel.font = .systemFont(ofSize: 16, weight: .semibold)
+        titleLabel.textColor = .label
+        subtitleLabel.font = .systemFont(ofSize: 13, weight: .regular)
+        subtitleLabel.textColor = .secondaryLabel
     }
     
     func configure(title: String, subtitle: String, isAdmin: Bool = false) {
@@ -50,4 +62,3 @@ class GroupsTableViewCell: UITableViewCell {
         adminBadge.isHidden = true
     }
 }
-

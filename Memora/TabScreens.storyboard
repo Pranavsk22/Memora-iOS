@@ -22,7 +22,7 @@
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="ZLY-eM-FX0" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
-            <point key="canvasLocation" x="116.79389312977099" y="953.52112676056345"/>
+            <point key="canvasLocation" x="89" y="946"/>
         </scene>
         <!--Groups-->
         <scene sceneID="R6z-T5-o7T">
@@ -34,7 +34,7 @@
                         <viewLayoutGuide key="safeArea" id="4LU-P5-Yfv"/>
                         <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                     </view>
-                    <navigationItem key="navigationItem" title="Groups" id="lRk-Su-82S"/>
+                    <navigationItem key="navigationItem" title="Groups" leftItemsSupplementBackButton="YES" id="lRk-Su-82S"/>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="rmV-cA-XY1" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
@@ -50,7 +50,7 @@
                         <viewLayoutGuide key="safeArea" id="gSz-CK-GGT"/>
                         <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                     </view>
-                    <navigationItem key="navigationItem" title="Memories" largeTitleDisplayMode="always" id="g7S-qT-63w"/>
+                    <navigationItem key="navigationItem" title="Memories" leftItemsSupplementBackButton="YES" largeTitleDisplayMode="always" id="g7S-qT-63w"/>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="HkO-8W-AhT" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
@@ -79,6 +79,7 @@
         <!--Home-->
         <scene sceneID="lF8-Fy-zr0">
             <objects>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="tGn-b9-v1B" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
                 <navigationController automaticallyAdjustsScrollViewInsets="NO" id="cuE-qC-8ks" sceneMemberID="viewController">
                     <tabBarItem key="tabBarItem" title="Home" image="house.fill" catalog="system" id="GLa-tC-LZi"/>
                     <toolbarItems/>
@@ -91,7 +92,6 @@
                         <segue destination="A9R-Js-cOa" kind="relationship" relationship="rootViewController" id="i5f-h7-jDP"/>
                     </connections>
                 </navigationController>
-                <placeholder placeholderIdentifier="IBFirstResponder" id="tGn-b9-v1B" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
             <point key="canvasLocation" x="-809.92366412213732" y="953.52112676056345"/>
         </scene>

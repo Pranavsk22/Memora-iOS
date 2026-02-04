@@ -21,80 +21,10 @@ class HomeViewController: UIViewController, UIGestureRecognizerDelegate {
         setupCategoriesCollectionView()
         setupExploreCollectionView()
         updateExploreHeight()
-        setupNavBar()
 
         // Ensure interactive pop gesture is enabled and delegate is set so swipe-to-go-back works
         navigationController?.interactivePopGestureRecognizer?.delegate = self
         navigationController?.interactivePopGestureRecognizer?.isEnabled = true
-    }
-
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        // Keep large titles enabled while Home is visible
-        navigationController?.navigationBar.prefersLargeTitles = true
-        navigationItem.largeTitleDisplayMode = .always
-    }
-
-    private func setupNavBar() {
-
-        // Enable large title
-        navigationController?.navigationBar.prefersLargeTitles = true
-        navigationItem.title = "Home"
-
-        // --- Make Home large title 34 heavy ---
-        let appearance = UINavigationBarAppearance()
-        appearance.configureWithTransparentBackground()
-        appearance.largeTitleTextAttributes = [
-            .font: UIFont.systemFont(ofSize: 34, weight: .heavy),
-            .foregroundColor: UIColor.label
-        ]
-        navigationController?.navigationBar.standardAppearance = appearance
-        navigationController?.navigationBar.scrollEdgeAppearance = appearance
-
-        // --- Avatar View (right bar button) ---
-        let size: CGFloat = 36
-        let avatarContainer = UIView(frame: CGRect(x: 0, y: 0, width: size, height: size))
-        avatarContainer.translatesAutoresizingMaskIntoConstraints = false
-
-        let imgView = UIImageView(frame: avatarContainer.bounds)
-        imgView.translatesAutoresizingMaskIntoConstraints = false
-        // Use session avatar (falls back to "photo" asset if not present)
-        imgView.image = UIImage(named: Session.shared.currentUser.avatarName ?? "photo")
-        imgView.contentMode = .scaleAspectFill
-        imgView.layer.cornerRadius = size / 2
-        imgView.clipsToBounds = true
-
-        avatarContainer.addSubview(imgView)
-
-        NSLayoutConstraint.activate([
-            imgView.leadingAnchor.constraint(equalTo: avatarContainer.leadingAnchor),
-            imgView.trailingAnchor.constraint(equalTo: avatarContainer.trailingAnchor),
-            imgView.topAnchor.constraint(equalTo: avatarContainer.topAnchor),
-            imgView.bottomAnchor.constraint(equalTo: avatarContainer.bottomAnchor)
-        ])
-
-        // Button wrapper so it behaves like a bar button
-        let button = UIButton(type: .custom)
-        button.frame = avatarContainer.bounds
-        button.addSubview(avatarContainer)
-        button.addTarget(self, action: #selector(profileTapped), for: .touchUpInside)
-
-        // Set fixed size constraints for the container
-        avatarContainer.widthAnchor.constraint(equalToConstant: size).isActive = true
-        avatarContainer.heightAnchor.constraint(equalToConstant: size).isActive = true
-
-        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: button)
-
-        // Force layout update to help alignment in large-title mode
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-            self.navigationController?.navigationBar.setNeedsLayout()
-            self.navigationController?.navigationBar.layoutIfNeeded()
-        }
-    }
-
-    @objc private func profileTapped() {
-        // no-op placeholder; keep minimal as requested
-        print("Profile tapped")
     }
 
     private func setupPromptsCollectionView() {
@@ -132,6 +62,7 @@ class HomeViewController: UIViewController, UIGestureRecognizerDelegate {
         exploreCollectionView.delegate = self
         exploreCollectionView.backgroundColor = .clear
         exploreCollectionView.isScrollEnabled = false
+        
 
         if let layout = exploreCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
             layout.scrollDirection = .vertical

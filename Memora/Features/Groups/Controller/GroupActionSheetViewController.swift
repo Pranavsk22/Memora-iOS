@@ -19,7 +19,7 @@ class GroupActionSheetViewController: UIViewController {
     
     private let containerView: UIView = {
         let view = UIView()
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = .secondarySystemGroupedBackground
         view.layer.cornerRadius = 24
         view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         view.clipsToBounds = true
@@ -28,7 +28,7 @@ class GroupActionSheetViewController: UIViewController {
     
     private let grabberView: UIView = {
         let view = UIView()
-        view.backgroundColor = .systemGray4
+        view.backgroundColor = .tertiaryLabel
         view.layer.cornerRadius = 2.5
         return view
     }()
@@ -38,6 +38,7 @@ class GroupActionSheetViewController: UIViewController {
         label.text = "Create or Join Group"
         label.font = .systemFont(ofSize: 20, weight: .semibold)
         label.textAlignment = .center
+        label.textColor = .label
         return label
     }()
     
@@ -74,10 +75,12 @@ class GroupActionSheetViewController: UIViewController {
         button.setTitle("Cancel", for: .normal)
         button.titleLabel?.font = .systemFont(ofSize: 17, weight: .regular)
         button.setTitleColor(.label, for: .normal)
-        button.backgroundColor = .systemGray5
+        button.backgroundColor = .tertiarySystemFill
         button.layer.cornerRadius = 12
         return button
     }()
+    
+    private let overlayView = UIView()
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -95,8 +98,8 @@ class GroupActionSheetViewController: UIViewController {
         view.backgroundColor = .clear
         
         // Add dark overlay
-        let overlayView = UIView()
-        overlayView.backgroundColor = .black.withAlphaComponent(0.5)
+        overlayView.backgroundColor = .black.withAlphaComponent(0.35)
+        overlayView.alpha = 0
         overlayView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(overlayView)
         view.sendSubviewToBack(overlayView)
@@ -176,7 +179,7 @@ class GroupActionSheetViewController: UIViewController {
     
     private func animatePresentation() {
         UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseOut, animations: {
-            self.view.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+            self.overlayView.alpha = 1
             self.containerView.transform = .identity
             self.containerView.alpha = 1
         })
@@ -184,7 +187,7 @@ class GroupActionSheetViewController: UIViewController {
     
     private func animateDismissal(completion: (() -> Void)? = nil) {
         UIView.animate(withDuration: 0.2, animations: {
-            self.view.backgroundColor = .clear
+            self.overlayView.alpha = 0
             self.containerView.transform = CGAffineTransform(translationX: 0, y: 400)
             self.containerView.alpha = 0
         }) { _ in

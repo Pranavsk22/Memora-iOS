@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.XIB" version="3.0" toolsVersion="24506" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES">
     <device id="retina6_12" orientation="portrait" appearance="light"/>
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="System colors in document resources" minToolsVersion="11.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
@@ -152,10 +152,10 @@
                             </constraints>
                         </view>
                         <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Azd-0p-jdV">
-                            <rect key="frame" x="16" y="248" width="361" height="65"/>
+                            <rect key="frame" x="16" y="248" width="361" height="50"/>
                             <subviews>
                                 <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Change Password" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="bPs-6l-Gae">
-                                    <rect key="frame" x="16" y="22" width="141" height="21"/>
+                                    <rect key="frame" x="16" y="14.666666666666686" width="141" height="21"/>
                                     <constraints>
                                         <constraint firstAttribute="width" constant="141" id="3vO-6G-ATm"/>
                                         <constraint firstAttribute="height" constant="21" id="5aN-mP-XWJ"/>
@@ -165,7 +165,7 @@
                                     <nil key="highlightedColor"/>
                                 </label>
                                 <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="auE-oF-G0c">
-                                    <rect key="frame" x="321.33333333333331" y="22" width="39.666666666666686" height="21"/>
+                                    <rect key="frame" x="321.33333333333331" y="14.666666666666686" width="39.666666666666686" height="21"/>
                                     <constraints>
                                         <constraint firstAttribute="height" constant="21" id="Daz-vv-W4F"/>
                                     </constraints>
@@ -178,7 +178,7 @@
                                     </connections>
                                 </button>
                                 <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="1vC-Kg-uzp">
-                                    <rect key="frame" x="16.333333333333343" y="15" width="305" height="35"/>
+                                    <rect key="frame" x="16.333333333333343" y="7.6666666666666856" width="305" height="35"/>
                                     <constraints>
                                         <constraint firstAttribute="width" constant="305" id="NZW-lE-TCo"/>
                                         <constraint firstAttribute="height" constant="35" id="Rih-jb-UJk"/>
@@ -192,7 +192,7 @@
                             </subviews>
                             <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                             <constraints>
-                                <constraint firstAttribute="height" constant="65" id="GQe-jb-zdk"/>
+                                <constraint firstAttribute="height" constant="50" id="GQe-jb-zdk"/>
                                 <constraint firstItem="auE-oF-G0c" firstAttribute="leading" secondItem="1vC-Kg-uzp" secondAttribute="trailing" id="Ngw-dL-3co"/>
                                 <constraint firstItem="bPs-6l-Gae" firstAttribute="centerY" secondItem="Azd-0p-jdV" secondAttribute="centerY" id="Wbu-eT-vLt"/>
                                 <constraint firstItem="1vC-Kg-uzp" firstAttribute="centerY" secondItem="auE-oF-G0c" secondAttribute="centerY" id="Yx7-Xa-FuV"/>
@@ -202,7 +202,7 @@
                             </constraints>
                         </view>
                         <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="For password recovery or to proactively address security concerns, click here to initiate the password change process" lineBreakMode="tailTruncation" numberOfLines="3" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="cVS-4W-bZg">
-                            <rect key="frame" x="20" y="333" width="353" height="70"/>
+                            <rect key="frame" x="20" y="318" width="353" height="70"/>
                             <constraints>
                                 <constraint firstAttribute="height" constant="70" id="U4x-Hj-Cbw"/>
                             </constraints>

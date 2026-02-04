@@ -54,6 +54,20 @@ class GroupDetailViewController: UIViewController {
         } else {
             navigationItem.rightBarButtonItem = shareButton
         }
+        
+        navigationItem.largeTitleDisplayMode = .never
+
+        // Native iOS nav bar appearance
+        let appearance = UINavigationBarAppearance()
+        appearance.configureWithTransparentBackground()
+        appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+        appearance.backgroundColor = .clear
+        appearance.titleTextAttributes = [.foregroundColor: UIColor.label]
+        appearance.largeTitleTextAttributes = [.foregroundColor: UIColor.label]
+
+        navigationController?.navigationBar.standardAppearance = appearance
+        navigationController?.navigationBar.scrollEdgeAppearance = appearance
+        navigationController?.navigationBar.compactAppearance = appearance
     }
     
     private func setupTableView() {
@@ -61,7 +75,7 @@ class GroupDetailViewController: UIViewController {
         tableView.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            tableView.topAnchor.constraint(equalTo: view.topAnchor),
             tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
@@ -72,7 +86,11 @@ class GroupDetailViewController: UIViewController {
         tableView.register(GroupMemberCell.self, forCellReuseIdentifier: "GroupMemberCell")
         tableView.register(GroupMemoryCell.self, forCellReuseIdentifier: "GroupMemoryCell")
         tableView.separatorStyle = .none
-        tableView.backgroundColor = .clear
+        tableView.backgroundColor = .systemGroupedBackground
+        tableView.showsVerticalScrollIndicator = false
+        
+        tableView.contentInset = UIEdgeInsets(top: 8, left: 0, bottom: 24, right: 0)
+        tableView.sectionHeaderTopPadding = 8
         
         // Add refresh control
         refreshControl.addTarget(self, action: #selector(refreshData), for: .valueChanged)
@@ -227,12 +245,33 @@ extension GroupDetailViewController: UITableViewDataSource, UITableViewDelegate 
         }
     }
     
-    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
-        return section == 0 ? "Members" : "Shared Memories"
+    func tableView(_ tableView: UITableView, viewForHeaderInSection section: Int) -> UIView? {
+        let header = UIView()
+
+        let label = UILabel()
+        label.font = .systemFont(ofSize: 13, weight: .semibold)
+        label.textColor = .secondaryLabel
+        label.text = section == 0 ? "MEMBERS" : "SHARED MEMORIES"
+
+        header.addSubview(label)
+        label.translatesAutoresizingMaskIntoConstraints = false
+
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: header.leadingAnchor, constant: 16),
+            label.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -16),
+            label.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -6),
+            label.topAnchor.constraint(equalTo: header.topAnchor, constant: 6)
+        ])
+
+        return header
+    }
+
+    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        return 34
     }
     
     func tableView(_ tableView: UITableView, heightForRowAt indexPath: IndexPath) -> CGFloat {
-        return indexPath.section == 0 ? 60 : 100
+        return indexPath.section == 0 ? 64 : 112
     }
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
@@ -268,18 +307,42 @@ class GroupMemberCell: UITableViewCell {
     }
     
     private func setupUI() {
+        selectionStyle = .none
+        backgroundColor = .clear
+        contentView.backgroundColor = .secondarySystemGroupedBackground
+        contentView.layer.cornerRadius = 14
+        contentView.layer.cornerCurve = .continuous
+        contentView.layer.masksToBounds = true
+        contentView.layer.borderWidth = 0.5
+        contentView.layer.borderColor = UIColor.separator.withAlphaComponent(0.25).cgColor
+
+        layer.shadowColor = UIColor.black.cgColor
+        layer.shadowOpacity = 0.06
+        layer.shadowRadius = 10
+        layer.shadowOffset = CGSize(width: 0, height: 6)
+        layer.masksToBounds = false
+
         profileImage.layer.cornerRadius = 20
         profileImage.clipsToBounds = true
         profileImage.backgroundColor = .systemGray5
         profileImage.image = UIImage(systemName: "person.circle.fill")
         profileImage.tintColor = .systemGray
+        profileImage.contentMode = .scaleAspectFill
         
-        nameLabel.font = .systemFont(ofSize: 16, weight: .medium)
+        nameLabel.font = .systemFont(ofSize: 16, weight: .semibold)
+        nameLabel.textColor = .label
         
         adminLabel.font = .systemFont(ofSize: 12, weight: .semibold)
         adminLabel.textColor = .systemBlue
         adminLabel.text = "Admin"
         adminLabel.isHidden = true
+        adminLabel.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.12)
+        adminLabel.layer.cornerRadius = 10
+        adminLabel.layer.cornerCurve = .continuous
+        adminLabel.clipsToBounds = true
+        adminLabel.textAlignment = .center
+        adminLabel.setContentHuggingPriority(.required, for: .horizontal)
+        adminLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         
         contentView.addSubview(profileImage)
         contentView.addSubview(nameLabel)
@@ -290,16 +353,19 @@ class GroupMemberCell: UITableViewCell {
         adminLabel.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            profileImage.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            profileImage.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
             profileImage.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             profileImage.widthAnchor.constraint(equalToConstant: 40),
             profileImage.heightAnchor.constraint(equalToConstant: 40),
             
             nameLabel.leadingAnchor.constraint(equalTo: profileImage.trailingAnchor, constant: 12),
             nameLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: adminLabel.leadingAnchor, constant: -10),
             
-            adminLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            adminLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor)
+            adminLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -14),
+            adminLabel.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
+            adminLabel.heightAnchor.constraint(equalToConstant: 20),
+            adminLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 54)
         ])
     }
     
@@ -328,17 +394,35 @@ class GroupMemoryCell: UITableViewCell {
     }
     
     private func setupUI() {
+        selectionStyle = .none
+        backgroundColor = .clear
+        contentView.backgroundColor = .secondarySystemGroupedBackground
+        contentView.layer.cornerRadius = 14
+        contentView.layer.cornerCurve = .continuous
+        contentView.layer.masksToBounds = true
+        contentView.layer.borderWidth = 0.5
+        contentView.layer.borderColor = UIColor.separator.withAlphaComponent(0.25).cgColor
+
+        layer.shadowColor = UIColor.black.cgColor
+        layer.shadowOpacity = 0.06
+        layer.shadowRadius = 10
+        layer.shadowOffset = CGSize(width: 0, height: 6)
+        layer.masksToBounds = false
+
         titleLabel.font = .systemFont(ofSize: 16, weight: .semibold)
-        titleLabel.numberOfLines = 1
+        titleLabel.textColor = .label
+        titleLabel.numberOfLines = 2
         
-        authorLabel.font = .systemFont(ofSize: 14)
+        authorLabel.font = .systemFont(ofSize: 13, weight: .regular)
         authorLabel.textColor = .secondaryLabel
         
-        dateLabel.font = .systemFont(ofSize: 12)
+        dateLabel.font = .systemFont(ofSize: 12, weight: .medium)
         dateLabel.textColor = .tertiaryLabel
         
         menuButton.setImage(UIImage(systemName: "ellipsis"), for: .normal)
-        menuButton.tintColor = .systemGray
+        menuButton.tintColor = .tertiaryLabel
+        menuButton.contentHorizontalAlignment = .fill
+        menuButton.contentVerticalAlignment = .fill
         menuButton.addTarget(self, action: #selector(menuButtonTapped), for: .touchUpInside)
         
         contentView.addSubview(titleLabel)
@@ -353,7 +437,7 @@ class GroupMemoryCell: UITableViewCell {
         
         NSLayoutConstraint.activate([
             titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 12),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 14),
             titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: menuButton.leadingAnchor, constant: -8),
             
             authorLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
@@ -363,10 +447,10 @@ class GroupMemoryCell: UITableViewCell {
             dateLabel.leadingAnchor.constraint(equalTo: titleLabel.leadingAnchor),
             dateLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12),
             
-            menuButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            menuButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -14),
             menuButton.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            menuButton.widthAnchor.constraint(equalToConstant: 24),
-            menuButton.heightAnchor.constraint(equalToConstant: 24)
+            menuButton.widthAnchor.constraint(equalToConstant: 16),
+            menuButton.heightAnchor.constraint(equalToConstant: 16)
         ])
     }
     

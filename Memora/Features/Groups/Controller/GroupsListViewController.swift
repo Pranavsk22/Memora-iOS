@@ -14,8 +14,7 @@ class GroupsListViewController: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        
-        view.backgroundColor = UIColor.systemGray6
+        view.backgroundColor = .systemGroupedBackground
         setupTableView()
         setupFloatingButton()
         setupEmptyState()
@@ -435,7 +434,13 @@ class GroupsListViewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        
+        navigationItem.rightBarButtonItem = UIBarButtonItem(
+            image: UIImage(systemName: "person.circle"),
+            style: .plain,
+            target: self,
+            action: #selector(profileTapped)
+        )
+        navigationItem.rightBarButtonItem?.tintColor = .label
         // load groups normally
         loadGroups()
     }
@@ -444,6 +449,12 @@ class GroupsListViewController: UIViewController {
         super.viewDidLayoutSubviews()
         // Ensure button stays circular after layout changes
         addGroupButton.layer.cornerRadius = addGroupButton.frame.width / 2
+
+        // Keep floating button in safe area (bottom-right)
+        let inset = view.safeAreaInsets
+        addGroupButton.transform = .identity
+        addGroupButton.frame.origin.x = view.bounds.width - inset.right - addGroupButton.frame.width - 20
+        addGroupButton.frame.origin.y = view.bounds.height - inset.bottom - addGroupButton.frame.height - 20
     }
     
     private func setupTableView() {
@@ -455,7 +466,9 @@ class GroupsListViewController: UIViewController {
         tableView.separatorStyle = .none
         tableView.backgroundColor = .clear
         tableView.rowHeight = 84
-        
+        tableView.showsVerticalScrollIndicator = false
+        tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 28, right: 0)
+        tableView.sectionHeaderTopPadding = 0
         // Add refresh control
         refreshControl.addTarget(self, action: #selector(refreshGroups), for: .valueChanged)
         refreshControl.tintColor = .systemBlue
@@ -467,6 +480,7 @@ class GroupsListViewController: UIViewController {
         addGroupButton.layer.cornerRadius = addGroupButton.frame.width / 2
         addGroupButton.clipsToBounds = true
         addGroupButton.backgroundColor = .systemBlue
+        addGroupButton.layer.cornerCurve = .continuous
         
         // Configure plus icon
         let config = UIImage.SymbolConfiguration(pointSize: 24, weight: .medium)
@@ -474,11 +488,11 @@ class GroupsListViewController: UIViewController {
         addGroupButton.setImage(plusImage, for: .normal)
         addGroupButton.tintColor = .white
         
-        // Shadow
+        // Shadow (subtle iOS style)
         addGroupButton.layer.shadowColor = UIColor.black.cgColor
-        addGroupButton.layer.shadowOpacity = 0.3
-        addGroupButton.layer.shadowOffset = CGSize(width: 0, height: 4)
-        addGroupButton.layer.shadowRadius = 8
+        addGroupButton.layer.shadowOpacity = 0.12
+        addGroupButton.layer.shadowOffset = CGSize(width: 0, height: 10)
+        addGroupButton.layer.shadowRadius = 20
         addGroupButton.layer.masksToBounds = false
         
         // Ensure button is on top
@@ -492,10 +506,17 @@ class GroupsListViewController: UIViewController {
         emptyStateLabel.text = "No groups yet\nCreate or join a group to get started"
         emptyStateLabel.textAlignment = .center
         emptyStateLabel.numberOfLines = 0
+        emptyStateLabel.font = .systemFont(ofSize: 16, weight: .semibold)
+        emptyStateLabel.textColor = .secondaryLabel
+        emptyStateImage.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 56, weight: .regular)
     }
     
     @objc private func debugButtonPress() {
         print("DEBUG: Button pressed at \(Date())")
+    }
+
+    @objc private func profileTapped() {
+        print("Profile tapped")
     }
     
     @objc private func refreshGroups() {
