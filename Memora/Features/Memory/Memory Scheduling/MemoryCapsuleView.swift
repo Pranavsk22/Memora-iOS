@@ -137,110 +137,254 @@ struct ScaleButtonStyle: ButtonStyle {
     }
 }
 
-// UIKit wrapper for MemoryViewController
-// Simpler UIKit-only MemoryCapsuleCell
+// MARK: - Fixed MemoryCapsuleCell (Visible Ready State)
 class MemoryCapsuleCell: UICollectionViewCell {
+    static let reuseId = "CapsuleCell"
+    
+    // UI Elements
+    private let containerView = UIView()
+    private let iconCircle = UIView()
+    private let iconImageView = UIImageView()
     private let titleLabel = UILabel()
-    private let dateLabel = UILabel()
-    private let giftIcon = UIImageView()
+    private let timerLabel = UILabel()
+    private let statusBadge = UIView()
+    private let statusLabel = UILabel()
+    
+    // Timer Logic
+    private var timer: Timer?
+    private var releaseDate: Date?
     private var tapHandler: (() -> Void)?
     
     override init(frame: CGRect) {
         super.init(frame: frame)
-        setup()
-        setupTapGesture()
+        setupUI()
+        setupGestures()
     }
     
     required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setup()
-        setupTapGesture()
+        fatalError("init(coder:) has not been implemented")
     }
     
-    private func setup() {
-        contentView.backgroundColor = UIColor(hex: "#5AC8FA").withAlphaComponent(0.1)
-        contentView.layer.cornerRadius = 16
-        contentView.layer.borderWidth = 2
-        contentView.layer.borderColor = UIColor(hex: "#5AC8FA").cgColor
-        contentView.clipsToBounds = true
+    private func setupUI() {
+        // 1. Cell Shadow
+        backgroundColor = .clear
+        layer.shadowColor = UIColor.black.cgColor
+        layer.shadowOpacity = 0.08
+        layer.shadowOffset = CGSize(width: 0, height: 4)
+        layer.shadowRadius = 12
+        layer.masksToBounds = false
         
-        // Configure gift icon
-        giftIcon.image = UIImage(systemName: "gift.fill")
-        giftIcon.tintColor = UIColor(hex: "#5AC8FA")
-        giftIcon.contentMode = .scaleAspectFit
-        giftIcon.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(giftIcon)
+        // 2. Main Container
+        containerView.translatesAutoresizingMaskIntoConstraints = false
+        containerView.layer.cornerRadius = 20
+        containerView.layer.cornerCurve = .continuous
+        containerView.clipsToBounds = true
+        containerView.backgroundColor = .secondarySystemBackground
+        contentView.addSubview(containerView)
         
-        // Configure title label
-        titleLabel.font = UIFont.systemFont(ofSize: 16, weight: .bold)
+        // 3. Icon Circle
+        iconCircle.translatesAutoresizingMaskIntoConstraints = false
+        iconCircle.backgroundColor = .systemBackground
+        iconCircle.layer.cornerRadius = 24
+        iconCircle.layer.shadowColor = UIColor.black.cgColor
+        iconCircle.layer.shadowOpacity = 0.05
+        iconCircle.layer.shadowOffset = CGSize(width: 0, height: 2)
+        iconCircle.layer.shadowRadius = 4
+        containerView.addSubview(iconCircle)
+        
+        // 4. Icon Image
+        iconImageView.translatesAutoresizingMaskIntoConstraints = false
+        iconImageView.contentMode = .scaleAspectFit
+        iconImageView.tintColor = .systemBlue
+        iconCircle.addSubview(iconImageView)
+        
+        // 5. Title
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.font = .systemFont(ofSize: 16, weight: .semibold)
         titleLabel.textColor = .label
         titleLabel.textAlignment = .center
         titleLabel.numberOfLines = 2
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(titleLabel)
+        containerView.addSubview(titleLabel)
         
-        // Configure date label
-        dateLabel.font = UIFont.systemFont(ofSize: 12)
-        dateLabel.textColor = .secondaryLabel
-        dateLabel.textAlignment = .center
-        dateLabel.numberOfLines = 2
-        dateLabel.translatesAutoresizingMaskIntoConstraints = false
-        contentView.addSubview(dateLabel)
+        // 6. Timer/Date Label
+        timerLabel.translatesAutoresizingMaskIntoConstraints = false
+        timerLabel.font = .monospacedDigitSystemFont(ofSize: 13, weight: .medium)
+        timerLabel.textColor = .secondaryLabel
+        timerLabel.textAlignment = .center
+        containerView.addSubview(timerLabel)
+        
+        // 7. Status Badge
+        statusBadge.translatesAutoresizingMaskIntoConstraints = false
+        statusBadge.backgroundColor = UIColor.systemGray6
+        statusBadge.layer.cornerRadius = 10
+        containerView.addSubview(statusBadge)
+        
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        statusLabel.font = .systemFont(ofSize: 10, weight: .bold)
+        statusLabel.textColor = .secondaryLabel
+        statusLabel.textAlignment = .center
+        statusBadge.addSubview(statusLabel)
         
         // Constraints
         NSLayoutConstraint.activate([
-            giftIcon.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            giftIcon.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
-            giftIcon.widthAnchor.constraint(equalToConstant: 40),
-            giftIcon.heightAnchor.constraint(equalToConstant: 40),
+            containerView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            containerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            containerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            containerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
             
-            titleLabel.topAnchor.constraint(equalTo: giftIcon.bottomAnchor, constant: 12),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+            iconCircle.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 24),
+            iconCircle.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            iconCircle.widthAnchor.constraint(equalToConstant: 48),
+            iconCircle.heightAnchor.constraint(equalToConstant: 48),
             
-            dateLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
-            dateLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
-            dateLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
-            dateLabel.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -12)
+            iconImageView.centerXAnchor.constraint(equalTo: iconCircle.centerXAnchor),
+            iconImageView.centerYAnchor.constraint(equalTo: iconCircle.centerYAnchor),
+            iconImageView.widthAnchor.constraint(equalToConstant: 24),
+            iconImageView.heightAnchor.constraint(equalToConstant: 24),
+            
+            titleLabel.topAnchor.constraint(equalTo: iconCircle.bottomAnchor, constant: 16),
+            titleLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
+            titleLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
+            
+            timerLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
+            timerLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
+            timerLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
+            
+            statusBadge.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -16),
+            statusBadge.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            statusBadge.heightAnchor.constraint(equalToConstant: 20),
+            
+            statusLabel.leadingAnchor.constraint(equalTo: statusBadge.leadingAnchor, constant: 8),
+            statusLabel.trailingAnchor.constraint(equalTo: statusBadge.trailingAnchor, constant: -8),
+            statusLabel.centerYAnchor.constraint(equalTo: statusBadge.centerYAnchor)
         ])
     }
     
-    private func setupTapGesture() {
-        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleTap))
-        contentView.addGestureRecognizer(tapGesture)
-        contentView.isUserInteractionEnabled = true
+    private func setupGestures() {
+        let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap))
+        contentView.addGestureRecognizer(tap)
     }
     
     @objc private func handleTap() {
+        UIView.animate(withDuration: 0.1, delay: 0, options: .curveEaseOut) {
+            self.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
+        } completion: { _ in
+            UIView.animate(withDuration: 0.1, delay: 0, options: .curveEaseOut) {
+                self.transform = .identity
+            }
+        }
         tapHandler?()
     }
     
-    func configure(with memory: ScheduledMemory, tapHandler: (() -> Void)? = nil) {
-        titleLabel.text = memory.title
+    // MARK: - Configuration
+    
+    func configure(with memory: ScheduledMemory, tapHandler: (() -> Void)?) {
         self.tapHandler = tapHandler
+        self.releaseDate = memory.releaseAt
+        titleLabel.text = memory.title
         
-        let releaseDate = memory.releaseAt
-        let formatter = DateFormatter()
-        formatter.dateStyle = .medium
-        formatter.timeStyle = .short
+        stopTimer()
         
         if memory.isReadyToOpen {
-            dateLabel.text = "Ready to open! 🎁"
-            dateLabel.textColor = .systemGreen
-            contentView.backgroundColor = UIColor(hex: "#5AC8FA").withAlphaComponent(0.3)
+            configureReadyState()
         } else {
-            dateLabel.text = "Unlocks: \(formatter.string(from: releaseDate))"
-            dateLabel.textColor = .secondaryLabel
-            contentView.backgroundColor = UIColor(hex: "#5AC8FA").withAlphaComponent(0.1)
+            configureLockedState()
+            startTimer()
         }
+    }
+    
+    private func startTimer() {
+        updateCountdown()
+        timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.updateCountdown()
+        }
+        if let timer = timer {
+            RunLoop.current.add(timer, forMode: .common)
+        }
+    }
+    
+    private func stopTimer() {
+        timer?.invalidate()
+        timer = nil
+    }
+    
+    private func updateCountdown() {
+        guard let releaseDate = releaseDate else { return }
+        let diff = releaseDate.timeIntervalSince(Date())
+        
+        if diff <= 0 {
+            stopTimer()
+            configureReadyState()
+            return
+        }
+        
+        let days = Int(diff) / 86400
+        let hours = Int(diff) / 3600 % 24
+        let minutes = Int(diff) / 60 % 60
+        let seconds = Int(diff) % 60
+        
+        if days > 1 {
+            timerLabel.text = "\(days) days left"
+        } else if days == 1 {
+            timerLabel.text = "1 day left"
+        } else {
+            timerLabel.text = String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+        }
+    }
+    
+    private func configureReadyState() {
+        // FIX: Set a solid blue background color so white text is visible
+        containerView.backgroundColor = UIColor(hex: "#5AC8FA")
+        
+        // UI Styling for Ready State
+        iconCircle.backgroundColor = .white.withAlphaComponent(0.2)
+        iconImageView.image = UIImage(systemName: "gift.fill")
+        iconImageView.tintColor = .white
+        
+        titleLabel.textColor = .white
+        
+        timerLabel.text = "Tap to open!"
+        timerLabel.textColor = .white.withAlphaComponent(0.9)
+        
+        statusBadge.backgroundColor = .white.withAlphaComponent(0.2)
+        statusLabel.text = "READY"
+        statusLabel.textColor = .white
+        
+        // Pulse Animation
+        iconCircle.layer.removeAllAnimations()
+        let pulse = CABasicAnimation(keyPath: "transform.scale")
+        pulse.duration = 1.2
+        pulse.fromValue = 1.0
+        pulse.toValue = 1.05
+        pulse.autoreverses = true
+        pulse.repeatCount = .infinity
+        iconCircle.layer.add(pulse, forKey: "pulse")
+    }
+    
+    private func configureLockedState() {
+        // Standard Grey Background
+        containerView.backgroundColor = .secondarySystemBackground
+        
+        // UI Styling for Locked State
+        iconCircle.backgroundColor = .systemBackground
+        iconImageView.image = UIImage(systemName: "lock.fill")
+        iconImageView.tintColor = .secondaryLabel
+        
+        titleLabel.textColor = .label
+        timerLabel.textColor = .secondaryLabel
+        
+        statusBadge.backgroundColor = .systemGray5
+        statusLabel.text = "LOCKED"
+        statusLabel.textColor = .secondaryLabel
+        
+        iconCircle.layer.removeAllAnimations()
     }
     
     override func prepareForReuse() {
         super.prepareForReuse()
+        stopTimer()
+        iconCircle.layer.removeAllAnimations()
         titleLabel.text = nil
-        dateLabel.text = nil
-        tapHandler = nil
-        contentView.backgroundColor = UIColor(hex: "#5AC8FA").withAlphaComponent(0.1)
-        dateLabel.textColor = .secondaryLabel
+        timerLabel.text = nil
     }
 }
