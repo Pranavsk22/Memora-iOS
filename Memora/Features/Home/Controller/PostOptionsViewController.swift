@@ -225,13 +225,14 @@ final class PostOptionsViewController: UIViewController {
     public var userImages: [UIImage] = []
     public var userAudioFiles: [(url: URL, duration: TimeInterval)] = []
     public var promptFallbackImageURL: String? = nil
+    public var promptText: String? = nil // NEW: Added for prompt text
 
     // MARK: UI
     private let dimView = UIControl()
     private let container = UIView()
     private let headingLabel = UILabel()
     private let descriptionLabel = UILabel()
-    private let titleField = UITextField()
+    private let titleLabel = UILabel() // CHANGED: From titleField to titleLabel
     private let yearField = UITextField()
 
     // Visibility dropdown button
@@ -302,6 +303,9 @@ final class PostOptionsViewController: UIViewController {
         
         // Load user groups
         loadUserGroups()
+        
+        // NEW: Set prompt as title if available
+        updateTitleFromPrompt()
     }
 
     deinit {
@@ -344,13 +348,22 @@ final class PostOptionsViewController: UIViewController {
         descriptionLabel.textColor = .secondaryLabel
         container.addSubview(descriptionLabel)
 
-        // title field
-        titleField.translatesAutoresizingMaskIntoConstraints = false
-        titleField.placeholder = "Title (required)"
-        titleField.borderStyle = .roundedRect
-        titleField.returnKeyType = .next
-        titleField.autocapitalizationType = .sentences
-        container.addSubview(titleField)
+        // title label (CHANGED: from text field to label)
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        titleLabel.text = "Title will be set from prompt"
+        titleLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        titleLabel.textColor = .label
+        titleLabel.numberOfLines = 0
+        titleLabel.textAlignment = .center
+        titleLabel.backgroundColor = UIColor(white: 0.95, alpha: 1.0)
+        titleLabel.layer.cornerRadius = 8
+        titleLabel.layer.masksToBounds = true
+        titleLabel.isUserInteractionEnabled = true // Allow tap to edit if needed
+        container.addSubview(titleLabel)
+        
+        // Add tap gesture to title label for editing if needed
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(titleLabelTapped))
+        titleLabel.addGestureRecognizer(tapGesture)
 
         // year field
         yearField.translatesAutoresizingMaskIntoConstraints = false
@@ -431,14 +444,14 @@ final class PostOptionsViewController: UIViewController {
             descriptionLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -18),
             descriptionLabel.topAnchor.constraint(equalTo: headingLabel.bottomAnchor, constant: 8),
 
-            titleField.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 18),
-            titleField.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -18),
-            titleField.topAnchor.constraint(equalTo: descriptionLabel.bottomAnchor, constant: 18),
-            titleField.heightAnchor.constraint(equalToConstant: 46),
+            titleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 18),
+            titleLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -18),
+            titleLabel.topAnchor.constraint(equalTo: descriptionLabel.bottomAnchor, constant: 18),
+            titleLabel.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
 
             yearField.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 18),
             yearField.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -18),
-            yearField.topAnchor.constraint(equalTo: titleField.bottomAnchor, constant: 12),
+            yearField.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
             yearField.heightAnchor.constraint(equalToConstant: 46),
 
             visibilityButton.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 18),
@@ -460,6 +473,37 @@ final class PostOptionsViewController: UIViewController {
             cancelButton.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -18)
         ])
     }
+    
+    // MARK: - NEW: Update title from prompt
+    private func updateTitleFromPrompt() {
+        if let promptText = promptText, !promptText.isEmpty {
+            titleLabel.text = promptText
+        } else if let bodyText = bodyText, !bodyText.isEmpty {
+            // Use body text as fallback
+            titleLabel.text = bodyText
+        }
+    }
+    
+    // MARK: - NEW: Handle title label tap
+    @objc private func titleLabelTapped() {
+        // Allow editing title if needed
+        let alert = UIAlertController(title: "Edit Title", message: nil, preferredStyle: .alert)
+        alert.addTextField { textField in
+            textField.text = self.titleLabel.text
+            textField.placeholder = "Memory title"
+        }
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        alert.addAction(UIAlertAction(title: "Save", style: .default) { _ in
+            if let newTitle = alert.textFields?.first?.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+               !newTitle.isEmpty {
+                self.titleLabel.text = newTitle
+                self.updatePostButtonState()
+            }
+        })
+        
+        present(alert, animated: true)
+    }
 
     // MARK: Setup Actions
     private func setupActions() {
@@ -468,12 +512,10 @@ final class PostOptionsViewController: UIViewController {
         postButton.addTarget(self, action: #selector(postTapped), for: .touchUpInside)
         cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
 
-        // text change observers
-        titleField.addTarget(self, action: #selector(textDidChange(_:)), for: .editingChanged)
+        // text change observers - only for year field now
         yearField.addTarget(self, action: #selector(textDidChange(_:)), for: .editingChanged)
 
         // navigate between fields
-        titleField.delegate = self
         yearField.delegate = self
     }
 
@@ -710,8 +752,8 @@ final class PostOptionsViewController: UIViewController {
 
     // MARK: Posting
     @objc private func postTapped() {
-        guard let titleText = titleField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !titleText.isEmpty else {
-            showValidationError("Please enter a title (required).")
+        guard let titleText = titleLabel.text?.trimmingCharacters(in: .whitespacesAndNewlines), !titleText.isEmpty else {
+            showValidationError("Please set a title for your memory.")
             return
         }
 
@@ -1041,7 +1083,7 @@ final class PostOptionsViewController: UIViewController {
 
     // MARK: Update Post Button State
     private func updatePostButtonState() {
-        let titleOK = !(titleField.text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        let titleOK = !(titleLabel.text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         let yearText = yearField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let yearOK = (yearText.count == 4 && Int(yearText) != nil)
 
@@ -1215,7 +1257,6 @@ final class PostOptionsViewController: UIViewController {
         DispatchQueue.main.async {
             self.postButton.isEnabled = enabled
             self.cancelButton.isEnabled = enabled
-            self.titleField.isEnabled = enabled
             self.yearField.isEnabled = enabled
             self.visibilityButton.isEnabled = enabled
             self.groupSelectionButton.isEnabled = enabled
@@ -1318,11 +1359,7 @@ final class PostOptionsViewController: UIViewController {
 // MARK: UITextFieldDelegate
 extension PostOptionsViewController: UITextFieldDelegate {
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        if textField === titleField {
-            yearField.becomeFirstResponder()
-        } else {
-            textField.resignFirstResponder()
-        }
+        textField.resignFirstResponder()
         return true
     }
 }

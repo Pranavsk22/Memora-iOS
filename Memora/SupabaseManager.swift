@@ -2508,4 +2508,50 @@ extension SupabaseManager {
         
         return try jsonDecoder.decode(SupabaseMemory.self, from: response.data)
     }
+    
+    
+    /// Delete a memory (only if owned by current user)
+    func deleteMemory(memoryId: UUID) async throws {
+        guard let userId = getCurrentUserId() else {
+            throw NSError(domain: "SupabaseManager", code: 401,
+                          userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        
+        print("DEBUG: Attempting to delete memory \(memoryId)")
+        print("DEBUG: Current user ID: \(userId)")
+        
+        // First, verify the user owns this memory
+        let memoryCheck = try await client
+            .from("memories")
+            .select("user_id")
+            .eq("id", value: memoryId.uuidString)
+            .single()
+            .execute()
+        
+        struct MemoryOwnerCheck: Decodable {
+            let userId: UUID
+            
+            enum CodingKeys: String, CodingKey {
+                case userId = "user_id"
+            }
+        }
+        
+        let memory = try jsonDecoder.decode(MemoryOwnerCheck.self, from: memoryCheck.data)
+        
+        // Check if current user is the owner
+        guard memory.userId.uuidString.lowercased() == userId.lowercased() else {
+            print("DEBUG: Permission denied - user \(userId) doesn't own memory \(memoryId)")
+            throw NSError(domain: "SupabaseManager", code: 403,
+                          userInfo: [NSLocalizedDescriptionKey: "You don't have permission to delete this memory"])
+        }
+        
+        // Delete the memory (cascade should handle memory_media, group_memories, etc.)
+        try await client
+            .from("memories")
+            .delete()
+            .eq("id", value: memoryId.uuidString)
+            .execute()
+        
+        print("DEBUG: Memory \(memoryId) deleted successfully")
+    }
 }

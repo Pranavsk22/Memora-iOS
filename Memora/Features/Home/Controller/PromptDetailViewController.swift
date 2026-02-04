@@ -1135,6 +1135,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
 
         // --- populate optional inputs so PostOptions can auto-save locally if no delegate ---
         vc.bodyText = textView.text
+        vc.promptText = prompt.text
         // collect images from attachments
         let imgs = attachments.compactMap { att -> UIImage? in
             switch att {
@@ -1257,7 +1258,14 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
     func postOptionsViewController(_ controller: UIViewController, didFinishPostingWithTitle title: String?, scheduleDate: Date?, visibility: MemoryVisibility) {
         // Build the body and attachments and save to local MemoryStore (preferred)
         controller.dismiss(animated: true) // dismiss the modal first (non-blocking)
-        let titleText = (title?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) ? "Untitled" : (title ?? "Untitled")
+        let titleText: String
+        if let customTitle = title?.trimmingCharacters(in: .whitespacesAndNewlines), !customTitle.isEmpty {
+            titleText = customTitle
+        } else {
+            // Fallback to prompt text as title
+            titleText = prompt.text
+        }
+        
         let bodyText = textView.text.isEmpty ? nil : textView.text
 
         // Resolve ownerId robustly (String or UUID or fallback)
