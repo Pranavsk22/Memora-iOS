@@ -8,6 +8,9 @@
 
 import Foundation
 import Supabase
+import UIKit
+
+
 
 class SupabaseManager {
     static let shared = SupabaseManager()
@@ -881,6 +884,7 @@ class SupabaseManager {
         }
     }
     
+
     
     
     // MARK: - Join Requests
@@ -1241,13 +1245,18 @@ class SupabaseManager {
                     created_at,
                     memories!inner(
                         id,
+                        user_id,
                         title,
-                        content,
-                        media_url,
-                        media_type,
                         year,
                         category,
+                        visibility,
+                        release_at,
                         created_at,
+                        memory_media!inner(
+                            media_url,
+                            media_type,
+                            text_content
+                        ),
                         profiles!inner(name)
                     )
                 """)
@@ -1272,28 +1281,67 @@ class SupabaseManager {
                       let createdAtString = item["created_at"] as? String,
                       let memoriesDict = item["memories"] as? [String: Any],
                       let memoryId = memoriesDict["id"] as? String,
+                      let userId = memoriesDict["user_id"] as? String,
                       let title = memoriesDict["title"] as? String,
                       let memoryCreatedAtString = memoriesDict["created_at"] as? String,
                       let profilesDict = memoriesDict["profiles"] as? [String: Any],
                       let userName = profilesDict["name"] as? String else {
-                    print("Skipping invalid memory data")
+                    print("Skipping invalid memory data - missing basic fields")
                     continue
                 }
                 
-                let content = memoriesDict["content"] as? String
-                let mediaUrl = memoriesDict["media_url"] as? String
-                let mediaType = memoriesDict["media_type"] as? String
+                // Extract content from memory_media
+                var content: String? = nil
+                var mediaUrl: String? = nil
+                var mediaType: String? = nil
+                var memoryMediaArray: [SupabaseMemoryMedia] = [] // ADD THIS
+                
+                if let memoryMediaRawArray = memoriesDict["memory_media"] as? [[String: Any]] {
+                    for media in memoryMediaRawArray {
+                        // Try to create SupabaseMemoryMedia from the raw data
+                        if let mediaUrlValue = media["media_url"] as? String,
+                           let mediaTypeValue = media["media_type"] as? String {
+                            
+                            let textContent = media["text_content"] as? String
+                            
+                            // Create a SupabaseMemoryMedia object
+                            // Note: You'll need to generate UUIDs for id and memoryId
+                            let memoryMedia = SupabaseMemoryMedia(
+                                id: UUID(), // Generate new UUID
+                                memoryId: UUID(uuidString: memoryId) ?? UUID(), // Convert or generate
+                                mediaUrl: mediaUrlValue,
+                                mediaType: mediaTypeValue,
+                                textContent: textContent,
+                                sortOrder: 0, // Default value
+                                createdAt: Date() // Default value
+                            )
+                            memoryMediaArray.append(memoryMedia)
+                            
+                            // Also set content if it's text media
+                            if mediaTypeValue == "text",
+                               let textContent = textContent,
+                               !textContent.isEmpty {
+                                content = textContent
+                            }
+                            
+                            // Set first non-text media as primary media
+                            if mediaUrl == nil && mediaTypeValue != "text" {
+                                mediaUrl = mediaUrlValue
+                                mediaType = mediaTypeValue
+                            }
+                        }
+                    }
+                }
+                
                 let year = memoriesDict["year"] as? Int
                 let category = memoriesDict["category"] as? String
                 
                 let createdAt = dateFormatter.date(from: createdAtString) ?? Date()
                 let memoryCreatedAt = dateFormatter.date(from: memoryCreatedAtString) ?? Date()
                 
-                // Note: We need to decide which userId to use - from group_memories or from memories?
-                // For now, we'll need to adjust the GroupMemory struct
                 let memory = GroupMemory(
-                    id: memoryId,  // Use the actual memory ID
-                    userId: "",    // We'll need to get this from memories table
+                    id: memoryId,
+                    userId: userId,
                     groupId: groupId,
                     title: title,
                     content: content,
@@ -1301,8 +1349,9 @@ class SupabaseManager {
                     mediaType: mediaType,
                     year: year,
                     category: category,
-                    createdAt: memoryCreatedAt,  // Use the memory creation date
-                    userName: userName
+                    createdAt: memoryCreatedAt,
+                    userName: userName,
+                    memoryMedia: memoryMediaArray
                 )
                 memories.append(memory)
             }
@@ -1775,5 +1824,688 @@ class SupabaseManager {
             case reviewedAt = "reviewed_at"
             case reviewedBy = "reviewed_by"
         }
+    }
+}
+
+
+// MARK: - Storage Management
+extension SupabaseManager {
+    
+    private func getStorageBucket() -> String {
+        return "memora-media" // Create this bucket in Supabase Storage
+    }
+    
+    /// Upload an image to Supabase Storage
+    func uploadImageToStorage(_ image: UIImage, fileName: String) async throws -> String {
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            throw NSError(domain: "SupabaseManager", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "Failed to convert image to JPEG"])
+        }
+        
+        let bucket = getStorageBucket()
+        let filePath = "images/\(UUID().uuidString)_\(fileName)"
+        
+        do {
+            let _ = try await client.storage
+                .from(bucket)
+                .upload(
+                    path: filePath,
+                    file: imageData,
+                    options: FileOptions(cacheControl: "3600", contentType: "image/jpeg")
+                )
+            
+            // Get public URL
+            let publicURL = try await client.storage
+                .from(bucket)
+                .getPublicURL(path: filePath)
+            
+            return publicURL.absoluteString
+            
+        } catch {
+            print("Error uploading image: \(error)")
+            throw error
+        }
+    }
+    
+    /// Upload an audio file to Supabase Storage
+    func uploadAudioToStorage(audioURL: URL, fileName: String) async throws -> String {
+        let bucket = getStorageBucket()
+        let filePath = "audio/\(UUID().uuidString)_\(fileName)"
+        
+        do {
+            let audioData = try Data(contentsOf: audioURL)
+            let fileExtension = audioURL.pathExtension.lowercased()
+            let contentType: String
+            
+            switch fileExtension {
+            case "mp3": contentType = "audio/mpeg"
+            case "m4a", "mp4": contentType = "audio/mp4"
+            case "wav": contentType = "audio/wav"
+            default: contentType = "audio/mpeg"
+            }
+            
+            let _ = try await client.storage
+                .from(bucket)
+                .upload(
+                    path: filePath,
+                    file: audioData,
+                    options: FileOptions(cacheControl: "3600", contentType: contentType)
+                )
+            
+            // Get public URL
+            let publicURL = try await client.storage
+                .from(bucket)
+                .getPublicURL(path: filePath)
+            
+            return publicURL.absoluteString
+            
+        } catch {
+            print("Error uploading audio: \(error)")
+            throw error
+        }
+    }
+    
+    /// Upload text content (for text-only memories)
+    func uploadTextToStorage(_ text: String, fileName: String) async throws -> String {
+        let bucket = getStorageBucket()
+        let filePath = "text/\(UUID().uuidString)_\(fileName).txt"
+        
+        guard let textData = text.data(using: .utf8) else {
+            throw NSError(domain: "SupabaseManager", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "Failed to encode text"])
+        }
+        
+        do {
+            let _ = try await client.storage
+                .from(bucket)
+                .upload(
+                    path: filePath,
+                    file: textData,
+                    options: FileOptions(cacheControl: "3600", contentType: "text/plain")
+                )
+            
+            let publicURL = try await client.storage
+                .from(bucket)
+                .getPublicURL(path: filePath)
+            
+            return publicURL.absoluteString
+            
+        } catch {
+            print("Error uploading text: \(error)")
+            throw error
+        }
+    }
+    
+    
+    func checkSessionStatus() async -> Bool {
+        do {
+            let session = try await client.auth.session
+            self.currentUser = session.user
+            print(" Session active for: \(session.user.email ?? "No email")")
+            return true
+        } catch {
+            print(" No active session: \(error)")
+            self.currentUser = nil
+            return false
+        }
+    }
+}
+
+
+
+// MARK: - Memory Creation & Management
+extension SupabaseManager {
+    
+    /// Create a memory in Supabase with media attachments
+    func createMemory(
+            title: String,
+            year: Int? = nil,
+            category: String? = nil,
+            visibility: MemoryVisibility,
+            scheduledDate: Date? = nil,
+            images: [UIImage] = [],
+            audioFiles: [(url: URL, duration: TimeInterval)] = [],
+            textContent: String? = nil
+        ) async throws -> SupabaseMemory {
+            
+            guard let userId = getCurrentUserId() else {
+                throw NSError(domain: "SupabaseManager", code: 401,
+                              userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+            }
+            
+            guard let userUUID = UUID(uuidString: userId) else {
+                throw NSError(domain: "SupabaseManager", code: -1,
+                              userInfo: [NSLocalizedDescriptionKey: "Invalid user ID format"])
+            }
+            
+            // Format the date for Supabase
+            let dateFormatter = ISO8601DateFormatter()
+            dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            
+            // Step 1: Create the memory record
+            let memoryResponse = try await client
+                .from("memories")
+                .insert([
+                    "user_id": AnyJSON.string(userId),
+                    "title": AnyJSON.string(title),
+                    "year": year.map { AnyJSON.integer($0) } ?? .null,
+                    "category": category.map { AnyJSON.string($0) } ?? .null,
+                    "visibility": AnyJSON.string(visibility.databaseString), // Fixed: use .databaseString
+                    "release_at": scheduledDate.map {
+                        AnyJSON.string(dateFormatter.string(from: $0))
+                    } ?? .null
+                ])
+                .select()
+                .single()
+                .execute()
+            
+            let memory = try jsonDecoder.decode(SupabaseMemory.self, from: memoryResponse.data)
+            print("✅ Memory created with ID: \(memory.id)")
+            
+            // Step 2: Upload and attach media
+            var sortOrder = 0
+            
+            // Upload images
+            for image in images {
+                do {
+                    let fileName = "image_\(UUID().uuidString).jpg"
+                    let mediaUrl = try await uploadImageToStorage(image, fileName: fileName)
+                    
+                    try await client
+                        .from("memory_media")
+                        .insert([
+                            "memory_id": AnyJSON.string(memory.id.uuidString),
+                            "media_url": AnyJSON.string(mediaUrl),
+                            "media_type": AnyJSON.string("photo"),
+                            "sort_order": AnyJSON.integer(sortOrder)
+                        ])
+                        .execute()
+                    
+                    sortOrder += 1
+                    print("✅ Image uploaded: \(mediaUrl)")
+                    
+                } catch {
+                    print("⚠️ Failed to upload image: \(error)")
+                    // Continue with other uploads
+                }
+            }
+            
+            // Upload audio files
+            for audioFile in audioFiles {
+                do {
+                    let fileName = "audio_\(UUID().uuidString).\(audioFile.url.pathExtension)"
+                    let mediaUrl = try await uploadAudioToStorage(audioURL: audioFile.url, fileName: fileName)
+                    
+                    try await client
+                        .from("memory_media")
+                        .insert([
+                            "memory_id": AnyJSON.string(memory.id.uuidString),
+                            "media_url": AnyJSON.string(mediaUrl),
+                            "media_type": AnyJSON.string("audio"),
+                            "sort_order": AnyJSON.integer(sortOrder),
+                            "text_content": AnyJSON.string("Audio: \(Int(audioFile.duration)) seconds")
+                        ])
+                        .execute()
+                    
+                    sortOrder += 1
+                    print("✅ Audio uploaded: \(mediaUrl)")
+                    
+                } catch {
+                    print("⚠️ Failed to upload audio: \(error)")
+                    // Continue with other uploads
+                }
+            }
+            
+            // Upload text content if provided
+            if let text = textContent, !text.isEmpty {
+                do {
+                    let fileName = "text_\(UUID().uuidString).txt"
+                    let mediaUrl = try await uploadTextToStorage(text, fileName: fileName)
+                    
+                    try await client
+                        .from("memory_media")
+                        .insert([
+                            "memory_id": AnyJSON.string(memory.id.uuidString),
+                            "media_url": AnyJSON.string(mediaUrl),
+                            "media_type": AnyJSON.string("text"),
+                            "sort_order": AnyJSON.integer(sortOrder),
+                            "text_content": AnyJSON.string(text)
+                        ])
+                        .execute()
+                    
+                    print("✅ Text content uploaded")
+                    
+                } catch {
+                    print("⚠️ Failed to upload text: \(error)")
+                }
+            }
+            
+            // Step 3: Also save locally for offline access
+            let localAttachments: [MemoryAttachment] = []
+            
+            MemoryStore.shared.createMemory(
+                ownerId: userId,
+                title: title,
+                body: textContent,
+                attachments: localAttachments,
+                visibility: visibility,
+                scheduledFor: scheduledDate,
+                category: category
+            ) { result in
+                switch result {
+                case .success(let localMemory):
+                    print("✅ Memory also saved locally: \(localMemory.id)")
+                case .failure(let error):
+                    print("⚠️ Failed to save memory locally: \(error)")
+                }
+            }
+            
+            return memory
+        }
+    
+    /// Share an existing memory with a group
+    func shareMemoryWithGroup(memoryId: UUID, groupId: UUID) async throws {
+        guard let userId = getCurrentUserId() else {
+            throw NSError(domain: "SupabaseManager", code: 401,
+                          userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        
+        print("DEBUG: Attempting to share memory \(memoryId) with group \(groupId)")
+        print("DEBUG: Current user ID: \(userId)")
+        
+        // DECODE PROPERLY using SupabaseMemory struct instead of [String: AnyJSON]
+        let memoryCheck = try await client
+            .from("memories")
+            .select("id, user_id, visibility")
+            .eq("id", value: memoryId.uuidString)
+            .single()
+            .execute()
+        
+        // Decode using the proper struct
+        struct MemoryCheckResponse: Decodable {
+            let id: UUID
+            let userId: UUID
+            let visibility: String
+            
+            enum CodingKeys: String, CodingKey {
+                case id
+                case userId = "user_id"
+                case visibility
+            }
+        }
+        
+        let memory = try jsonDecoder.decode(MemoryCheckResponse.self, from: memoryCheck.data)
+        
+        print("DEBUG: Memory owner ID: \(memory.userId)")
+        print("DEBUG: Memory visibility: \(memory.visibility)")
+        
+        // FIXED: Only allow sharing if user OWNS the memory
+        // Remove the "everyone" visibility check - that doesn't grant sharing rights
+        guard memory.userId.uuidString.lowercased() == userId.lowercased() else {
+            print("DEBUG: Permission denied - user \(userId) doesn't own memory \(memory.id)")
+            throw NSError(domain: "SupabaseManager", code: 403,
+                          userInfo: [NSLocalizedDescriptionKey: "You don't have permission to share this memory"])
+        }
+        
+        print("DEBUG: User owns memory, proceeding with sharing...")
+        
+        // Check if already shared with group
+        let existingCheck = try await client
+            .from("memory_group_access")
+            .select("id")
+            .eq("memory_id", value: memoryId.uuidString)
+            .eq("group_id", value: groupId.uuidString)
+            .execute()
+        
+        if let jsonArray = try? JSONSerialization.jsonObject(with: existingCheck.data) as? [[String: Any]],
+           !jsonArray.isEmpty {
+            print("Memory already shared with this group")
+            return
+        }
+        
+        // Create group memory link
+        try await client
+            .from("group_memories")
+            .insert([
+                "user_id": AnyJSON.string(userId),
+                "group_id": AnyJSON.string(groupId.uuidString),
+                "memory_id": AnyJSON.string(memoryId.uuidString)
+            ])
+            .execute()
+        
+        print("DEBUG: Created entry in group_memories")
+        
+        // Also create memory_group_access for all group members
+        try await client
+            .from("memory_group_access")
+            .insert([
+                "memory_id": AnyJSON.string(memoryId.uuidString),
+                "group_id": AnyJSON.string(groupId.uuidString)
+            ])
+            .execute()
+        
+        print("Memory shared with group successfully")
+    }
+    
+    /// Create a memory specifically for a group (group-only memory)
+    func createMemoryForGroup(
+        groupId: UUID,
+        title: String,
+        year: Int? = nil,
+        category: String? = nil,
+        images: [UIImage] = [],
+        audioFiles: [(url: URL, duration: TimeInterval)] = [],
+        textContent: String? = nil
+    ) async throws -> SupabaseMemory {
+        
+        // Create memory with group visibility
+        let memory = try await createMemory(
+            title: title,
+            year: year,
+            category: category,
+            visibility: .group, // We'll need to add this to MemoryVisibility
+            scheduledDate: nil,
+            images: images,
+            audioFiles: audioFiles,
+            textContent: textContent
+        )
+        
+        // Link to group
+        try await shareMemoryWithGroup(memoryId: memory.id, groupId: groupId)
+        
+        return memory
+    }
+    
+    /// Get memories for a specific group
+    func getMemoriesForGroup(groupId: UUID) async throws -> [SupabaseMemory] {
+        let response = try await client
+            .from("memory_group_access")
+            .select("""
+                id,
+                created_at,
+                memories:memories (
+                    id,
+                    user_id,
+                    title,
+                    year,
+                    category,
+                    visibility,
+                    release_at,
+                    created_at,
+                    updated_at,
+                    memory_media:memory_media (
+                        id,
+                        memory_id,       
+                        media_url,
+                        media_type,
+                        text_content,
+                        sort_order,
+                        created_at 
+                    )
+                )
+            """)
+            .eq("group_id", value: groupId.uuidString)
+            .order("created_at", ascending: false)
+            .execute()
+        
+        // Parse the response
+        struct GroupMemoryAccess: Codable {
+            let id: UUID
+            let createdAt: Date
+            let memories: SupabaseMemory
+            
+            enum CodingKeys: String, CodingKey {
+                case id
+                case createdAt = "created_at"
+                case memories
+            }
+        }
+        
+        let accessList = try jsonDecoder.decode([GroupMemoryAccess].self, from: response.data)
+        return accessList.map { $0.memories }
+    }
+    
+    /// Get user's own memories
+    func getUserMemories() async throws -> [SupabaseMemory] {
+        guard let userId = getCurrentUserId() else {
+            return []
+        }
+        
+        let response = try await client
+            .from("memories")
+            .select("""
+                *,
+                memory_media (
+                    id,
+                    memory_id,           
+                    media_url,
+                    media_type,
+                    text_content,
+                    sort_order,
+                    created_at          
+                )
+            """)
+            .eq("user_id", value: userId)
+            .order("created_at", ascending: false)
+            .execute()
+        
+        return try jsonDecoder.decode([SupabaseMemory].self, from: response.data)
+    }
+    
+    
+}
+
+
+
+extension SupabaseManager {
+    
+    // MARK: - Scheduled Memories
+    
+    /// Get all scheduled memories for current user
+    func getScheduledMemories() async throws -> [ScheduledMemory] {
+        guard let userId = getCurrentUserId() else {
+            return []
+        }
+        
+        // Use a simpler query that matches your data structure
+        let response = try await client
+            .from("memories")
+            .select("""
+                *,
+                memory_media (
+                    id,
+                    memory_id,
+                    media_url,
+                    media_type,
+                    text_content,
+                    sort_order,
+                    created_at
+                )
+            """)
+            .eq("user_id", value: userId)
+            .eq("visibility", value: "scheduled")
+            .not("release_at", operator: .is, value: "null")
+            .order("release_at", ascending: true)
+            .execute()
+        
+        // First decode as SupabaseMemory array
+        let supabaseMemories = try jsonDecoder.decode([SupabaseMemory].self, from: response.data)
+        
+        // Convert to ScheduledMemory
+        return supabaseMemories.compactMap { supabaseMemory in
+            guard let releaseAt = supabaseMemory.releaseAt else { return nil }
+            
+            let previewImageUrl = supabaseMemory.memoryMedia?.first { $0.mediaType == "photo" }?.mediaUrl
+            
+            return ScheduledMemory(
+                id: supabaseMemory.id,
+                title: supabaseMemory.title,
+                year: supabaseMemory.year,
+                category: supabaseMemory.category,
+                releaseAt: releaseAt,
+                createdAt: supabaseMemory.createdAt,
+                userId: supabaseMemory.userId,
+                previewImageUrl: previewImageUrl,
+                isReadyToOpen: releaseAt <= Date()
+            )
+        }
+    }
+
+    
+    /// Open a scheduled memory (change visibility from scheduled to private/everyone)
+    func openScheduledMemory(memoryId: UUID) async throws {
+        do {
+            try await client
+                .from("memories")
+                .update([
+                    "visibility": "private"
+                ])
+                .eq("id", value: memoryId.uuidString)
+                .execute()
+            
+            print("✅ Memory \(memoryId) opened successfully")
+            
+        } catch {
+            print("Error opening memory: \(error)")
+            throw error
+        }
+    }
+    
+    /// Check for ready-to-open memories and return them
+    func checkForReadyMemories() async throws -> [ScheduledMemory] {
+        let allScheduled = try await getScheduledMemories()
+        return allScheduled.filter { $0.isReadyToOpen }
+    }
+    
+    /// Schedule a memory for future release
+
+    func scheduleMemory(
+        title: String,
+        year: Int? = nil,
+        category: String? = nil,
+        releaseDate: Date,
+        images: [UIImage] = [],
+        audioFiles: [(url: URL, duration: TimeInterval)] = [],
+        textContent: String? = nil
+    ) async throws -> ScheduledMemory {
+        
+        // Create memory with scheduled visibility using the correct case
+        let memory = try await createMemory(
+            title: title,
+            year: year,
+            category: category,
+            visibility: MemoryVisibility.scheduled,
+            scheduledDate: releaseDate,
+            images: images,
+            audioFiles: audioFiles,
+            textContent: textContent
+        )
+        
+        // Convert to ScheduledMemory
+        return ScheduledMemory(
+            id: memory.id,
+            title: memory.title,
+            year: memory.year,
+            category: memory.category,
+            releaseAt: releaseDate,
+            createdAt: memory.createdAt,
+            userId: memory.userId,
+            previewImageUrl: nil, 
+            isReadyToOpen: false
+        )
+    }
+    
+    
+    
+    /// Get a specific scheduled memory by ID
+    func getScheduledMemory(by id: UUID) async throws -> ScheduledMemory {
+        guard let userId = getCurrentUserId() else {
+            throw NSError(domain: "SupabaseManager", code: 401,
+                          userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        
+        do {
+            let response = try await client
+                .from("memories")
+                .select("""
+                    *,
+                    memory_media!inner(
+                        media_url,
+                        media_type
+                    )
+                """)
+                .eq("id", value: id.uuidString)
+                .eq("user_id", value: userId)
+                .single()
+                .execute()
+            
+            // Parse manually
+            guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any] else {
+                throw NSError(domain: "SupabaseManager", code: -1,
+                              userInfo: [NSLocalizedDescriptionKey: "Could not parse memory data"])
+            }
+            
+            let dateFormatter = ISO8601DateFormatter()
+            dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            
+            guard let idString = json["id"] as? String,
+                  let id = UUID(uuidString: idString),
+                  let userIdString = json["user_id"] as? String,
+                  let userId = UUID(uuidString: userIdString),
+                  let title = json["title"] as? String,
+                  let createdAtString = json["created_at"] as? String,
+                  let releaseAtString = json["release_at"] as? String,
+                  let createdAt = dateFormatter.date(from: createdAtString),
+                  let releaseAt = dateFormatter.date(from: releaseAtString) else {
+                throw NSError(domain: "SupabaseManager", code: -1,
+                              userInfo: [NSLocalizedDescriptionKey: "Invalid memory data"])
+            }
+            
+            let year = json["year"] as? Int
+            let category = json["category"] as? String
+            
+            // Extract preview image
+            var previewImageUrl: String? = nil
+            if let mediaArray = json["memory_media"] as? [[String: Any]] {
+                for media in mediaArray {
+                    if let mediaType = media["media_type"] as? String,
+                       mediaType == "photo",
+                       let mediaUrl = media["media_url"] as? String {
+                        previewImageUrl = mediaUrl
+                        break
+                    }
+                }
+            }
+            
+            let isReadyToOpen = releaseAt <= Date()
+            
+            return ScheduledMemory(
+                id: id,
+                title: title,
+                year: year,
+                category: category,
+                releaseAt: releaseAt,
+                createdAt: createdAt,
+                userId: userId,
+                previewImageUrl: previewImageUrl,
+                isReadyToOpen: isReadyToOpen
+            )
+            
+        } catch {
+            print("Error fetching scheduled memory: \(error)")
+            throw error
+        }
+    }
+    
+    /// Get a memory by ID
+    func getMemory(by id: UUID) async throws -> SupabaseMemory {
+        let response = try await client
+            .from("memories")
+            .select()
+            .eq("id", value: id.uuidString)
+            .single()
+            .execute()
+        
+        return try jsonDecoder.decode(SupabaseMemory.self, from: response.data)
     }
 }

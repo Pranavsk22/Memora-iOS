@@ -1,22 +1,230 @@
-//
-//  PostOptionsViewController.swift
-//  Home
-//
-//  Updated to integrate Memory model / MemoryStore (local save fallback)
-//
-
+// PostOptionsViewController.swift
 import UIKit
+import SwiftUI
+
+extension Notification.Name {
+    static let memoriesUpdated = Notification.Name("memoriesUpdated")
+}
+
+class ScheduleDatePickerViewController: UIViewController {
+    
+    var onDateSelected: ((Date) -> Void)?
+    
+    private let containerView = UIView()
+    private let titleLabel = UILabel()
+    private let datePicker = UIDatePicker()
+    private let durationSegments = UISegmentedControl(items: ["1 Week", "1 Month", "3 Months", "6 Months", "1 Year", "Custom"])
+    private let scheduleButton = UIButton(type: .system)
+    private let cancelButton = UIButton(type: .system)
+    
+    private let capsulePreview = UIView()
+    private let capsuleIcon = UIImageView()
+    private let capsuleLabel = UILabel()
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupUI()
+        setupActions()
+        updateCapsulePreview(for: datePicker.date)
+    }
+    
+    private func setupUI() {
+        view.backgroundColor = UIColor(hex: "#F2F2F7")
+        
+        // Container
+        containerView.backgroundColor = .systemBackground
+        containerView.layer.cornerRadius = 20
+        containerView.clipsToBounds = true
+        containerView.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(containerView)
+        
+        // Title
+        titleLabel.text = "Schedule Memory Capsule"
+        titleLabel.font = UIFont.systemFont(ofSize: 24, weight: .bold)
+        titleLabel.textAlignment = .center
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(titleLabel)
+        
+        // Duration segments
+        durationSegments.selectedSegmentIndex = 1
+        durationSegments.addTarget(self, action: #selector(durationChanged), for: .valueChanged)
+        durationSegments.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(durationSegments)
+        
+        // Date picker
+        datePicker.datePickerMode = .dateAndTime
+        datePicker.preferredDatePickerStyle = .wheels
+        datePicker.minimumDate = Date().addingTimeInterval(3600)
+        datePicker.maximumDate = Date().addingTimeInterval(365 * 86400)
+        datePicker.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(datePicker)
+        
+        // Capsule preview
+        setupCapsulePreview()
+        
+        // Schedule button
+        scheduleButton.setTitle("Schedule Capsule", for: .normal)
+        scheduleButton.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        scheduleButton.backgroundColor = UIColor(hex: "#5AC8FA")
+        scheduleButton.setTitleColor(.white, for: .normal)
+        scheduleButton.layer.cornerRadius = 14
+        scheduleButton.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(scheduleButton)
+        
+        // Cancel button
+        cancelButton.setTitle("Cancel", for: .normal)
+        cancelButton.setTitleColor(.systemRed, for: .normal)
+        cancelButton.titleLabel?.font = UIFont.systemFont(ofSize: 17)
+        cancelButton.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(cancelButton)
+        
+        // Constraints
+        NSLayoutConstraint.activate([
+            containerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            containerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            containerView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            containerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 500),
+            
+            titleLabel.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 24),
+            titleLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
+            titleLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
+            
+            durationSegments.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
+            durationSegments.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
+            durationSegments.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
+            
+            datePicker.topAnchor.constraint(equalTo: durationSegments.bottomAnchor, constant: 20),
+            datePicker.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
+            datePicker.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
+            datePicker.heightAnchor.constraint(equalToConstant: 200),
+            
+            capsulePreview.topAnchor.constraint(equalTo: datePicker.bottomAnchor, constant: 20),
+            capsulePreview.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            capsulePreview.widthAnchor.constraint(equalToConstant: 120),
+            capsulePreview.heightAnchor.constraint(equalToConstant: 120),
+            
+            scheduleButton.topAnchor.constraint(equalTo: capsulePreview.bottomAnchor, constant: 24),
+            scheduleButton.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 32),
+            scheduleButton.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -32),
+            scheduleButton.heightAnchor.constraint(equalToConstant: 56),
+            
+            cancelButton.topAnchor.constraint(equalTo: scheduleButton.bottomAnchor, constant: 12),
+            cancelButton.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            cancelButton.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -20)
+        ])
+    }
+    
+    private func setupCapsulePreview() {
+        capsulePreview.backgroundColor = UIColor(hex: "#FFD700").withAlphaComponent(0.1)
+        capsulePreview.layer.cornerRadius = 20
+        capsulePreview.layer.borderWidth = 2
+        capsulePreview.layer.borderColor = UIColor(hex: "#FFD700").withAlphaComponent(0.3).cgColor
+        capsulePreview.translatesAutoresizingMaskIntoConstraints = false
+        containerView.addSubview(capsulePreview)
+        
+        capsuleIcon.image = UIImage(systemName: "gift.fill")
+        capsuleIcon.tintColor = UIColor(hex: "#FFD700")
+        capsuleIcon.contentMode = .scaleAspectFit
+        capsuleIcon.translatesAutoresizingMaskIntoConstraints = false
+        capsulePreview.addSubview(capsuleIcon)
+        
+        capsuleLabel.text = "Gold Capsule"
+        capsuleLabel.font = UIFont.systemFont(ofSize: 12, weight: .medium)
+        capsuleLabel.textColor = UIColor(hex: "#FFD700")
+        capsuleLabel.textAlignment = .center
+        capsuleLabel.translatesAutoresizingMaskIntoConstraints = false
+        capsulePreview.addSubview(capsuleLabel)
+        
+        NSLayoutConstraint.activate([
+            capsuleIcon.centerXAnchor.constraint(equalTo: capsulePreview.centerXAnchor),
+            capsuleIcon.centerYAnchor.constraint(equalTo: capsulePreview.centerYAnchor, constant: -10),
+            capsuleIcon.widthAnchor.constraint(equalToConstant: 40),
+            capsuleIcon.heightAnchor.constraint(equalToConstant: 40),
+            
+            capsuleLabel.topAnchor.constraint(equalTo: capsuleIcon.bottomAnchor, constant: 8),
+            capsuleLabel.centerXAnchor.constraint(equalTo: capsulePreview.centerXAnchor),
+            capsuleLabel.leadingAnchor.constraint(equalTo: capsulePreview.leadingAnchor, constant: 8),
+            capsuleLabel.trailingAnchor.constraint(equalTo: capsulePreview.trailingAnchor, constant: -8)
+        ])
+    }
+    
+    private func setupActions() {
+        datePicker.addTarget(self, action: #selector(datePickerChanged), for: .valueChanged)
+        scheduleButton.addTarget(self, action: #selector(scheduleTapped), for: .touchUpInside)
+        cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
+    }
+    
+    @objc private func durationChanged() {
+        let now = Date()
+        let calendar = Calendar.current
+        
+        switch durationSegments.selectedSegmentIndex {
+        case 0: datePicker.date = calendar.date(byAdding: .weekOfYear, value: 1, to: now) ?? now.addingTimeInterval(7 * 86400)
+        case 1: datePicker.date = calendar.date(byAdding: .month, value: 1, to: now) ?? now.addingTimeInterval(30 * 86400)
+        case 2: datePicker.date = calendar.date(byAdding: .month, value: 3, to: now) ?? now.addingTimeInterval(90 * 86400)
+        case 3: datePicker.date = calendar.date(byAdding: .month, value: 6, to: now) ?? now.addingTimeInterval(180 * 86400)
+        case 4: datePicker.date = calendar.date(byAdding: .year, value: 1, to: now) ?? now.addingTimeInterval(365 * 86400)
+        default: break
+        }
+        
+        updateCapsulePreview(for: datePicker.date)
+    }
+    
+    @objc private func datePickerChanged() {
+        updateCapsulePreview(for: datePicker.date)
+    }
+    
+    private func updateCapsulePreview(for date: Date) {
+        let duration = date.timeIntervalSince(Date())
+        let days = Int(duration / 86400)
+        
+        let color: UIColor
+        let icon: String
+        let label: String
+        
+        if days >= 365 {
+            color = UIColor(hex: "#FFD700")
+            icon = "crown.fill"
+            label = "Gold Capsule"
+        } else if days >= 30 {
+            color = UIColor(hex: "#C0C0C0")
+            icon = "star.fill"
+            label = "Silver Capsule"
+        } else {
+            color = UIColor(hex: "#CD7F32")
+            icon = "heart.fill"
+            label = "Bronze Capsule"
+        }
+        
+        UIView.animate(withDuration: 0.3) {
+            self.capsulePreview.backgroundColor = color.withAlphaComponent(0.1)
+            self.capsulePreview.layer.borderColor = color.withAlphaComponent(0.3).cgColor
+            self.capsuleIcon.tintColor = color
+            self.capsuleLabel.textColor = color
+            self.capsuleLabel.text = label
+            self.capsuleIcon.image = UIImage(systemName: icon)
+        }
+    }
+    
+    @objc private func scheduleTapped() {
+        onDateSelected?(datePicker.date)
+        dismiss(animated: true)
+    }
+    
+    @objc private func cancelTapped() {
+        dismiss(animated: true)
+    }
+}
 
 final class PostOptionsViewController: UIViewController {
     weak var delegate: PostOptionsViewControllerDelegate?
 
-    // MARK: — New: optional inputs from caller (PromptDetailViewControllerSimple should set these)
-    /// If provided, these images and audio files will be saved into the Memory when posting locally.
+    // MARK: — New: optional inputs from caller
     public var autoSaveToLocalStoreIfNoDelegate: Bool = true
-    public var bodyText: String? = nil                       // body content from text view
-    public var userImages: [UIImage] = []                    // images picked by user
-    public var userAudioFiles: [(url: URL, duration: TimeInterval)] = [] // temp audio files recorded
-    public var promptFallbackImageURL: String? = nil         // remote prompt image to use if user didn't attach one
+    public var bodyText: String? = nil
+    public var userImages: [UIImage] = []
+    public var userAudioFiles: [(url: URL, duration: TimeInterval)] = []
+    public var promptFallbackImageURL: String? = nil
 
     // MARK: UI
     private let dimView = UIControl()
@@ -26,16 +234,25 @@ final class PostOptionsViewController: UIViewController {
     private let titleField = UITextField()
     private let yearField = UITextField()
 
-    // Visibility dropdown button (capsule)
+    // Visibility dropdown button
     private let visibilityButton = UIButton(type: .system)
-    private var visibilityMenuAnchor: UIView? // not used for popover; kept for clarity
-    private var selectedVisibility: Visibility = .everyone {
-        didSet { updateVisibilityButtonTitle() }
+    private var selectedVisibility: PostVisibility = .everyone {
+        didSet {
+            updateVisibilityButtonTitle()
+            updateGroupSelectionVisibility()
+        }
     }
+
+    // Group selection
+    private let groupSelectionStack = UIStackView()
+    private let groupSelectionButton = UIButton(type: .system)
+    private var selectedGroup: UserGroup?
+    private var userGroups: [UserGroup] = []
+    private var groupSelectionVisible: Bool = false
 
     // schedule
     private var selectedScheduleDate: Date = Date()
-    private var scheduleChosen: Bool = false // true if user explicitly chose schedule and date
+    private var scheduleChosen: Bool = false
 
     // buttons
     private let postButton = UIButton(type: .system)
@@ -47,25 +264,28 @@ final class PostOptionsViewController: UIViewController {
 
     // constraints for keyboard movement
     private var containerCenterY: NSLayoutConstraint?
+    private var groupSelectionHeightConstraint: NSLayoutConstraint?
 
     // keyboard observers
     private var keyboardObserversAdded = false
 
-    // small validation helpers
-    private enum Visibility {
-        case everyone, `private`, schedule
+    // Local enum for UI - DIFFERENT NAME to avoid conflict
+    private enum PostVisibility {
+        case everyone, `private`, scheduledPost, group
         var asMemoryVisibility: MemoryVisibility {
             switch self {
             case .everyone: return .everyone
             case .private: return .private
-            case .schedule: return .scheduled
+            case .scheduledPost: return MemoryVisibility.scheduled
+            case .group: return .group
             }
         }
         var title: String {
             switch self {
             case .everyone: return "Everyone"
             case .private: return "Private"
-            case .schedule: return "Schedule"
+            case .scheduledPost: return "Schedule"
+            case .group: return "Group"
             }
         }
     }
@@ -79,6 +299,9 @@ final class PostOptionsViewController: UIViewController {
         updateVisibilityButtonTitle()
         updatePostButtonState()
         addKeyboardObservers()
+        
+        // Load user groups
+        loadUserGroups()
     }
 
     deinit {
@@ -129,7 +352,7 @@ final class PostOptionsViewController: UIViewController {
         titleField.autocapitalizationType = .sentences
         container.addSubview(titleField)
 
-        // year field (kept for compatibility with your UI)
+        // year field
         yearField.translatesAutoresizingMaskIntoConstraints = false
         yearField.placeholder = "Year (e.g. 1999) (required)"
         yearField.borderStyle = .roundedRect
@@ -146,7 +369,32 @@ final class PostOptionsViewController: UIViewController {
         visibilityButton.contentEdgeInsets = UIEdgeInsets(top: 14, left: 24, bottom: 14, right: 24)
         container.addSubview(visibilityButton)
 
-        // post button (black capsule)
+        // Group selection stack (initially hidden)
+        groupSelectionStack.axis = .vertical
+        groupSelectionStack.spacing = 12
+        groupSelectionStack.translatesAutoresizingMaskIntoConstraints = false
+        container.addSubview(groupSelectionStack)
+
+        // Group selection label
+        let groupLabel = UILabel()
+        groupLabel.text = "Select Group"
+        groupLabel.font = UIFont.systemFont(ofSize: 15, weight: .medium)
+        groupLabel.textColor = .secondaryLabel
+        groupSelectionStack.addArrangedSubview(groupLabel)
+
+        // Group selection button
+        groupSelectionButton.translatesAutoresizingMaskIntoConstraints = false
+        groupSelectionButton.setTitle("Tap to select group", for: .normal)
+        groupSelectionButton.setTitleColor(.label, for: .normal)
+        groupSelectionButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+        groupSelectionButton.backgroundColor = UIColor(white: 0.96, alpha: 1)
+        groupSelectionButton.layer.cornerRadius = 16
+        groupSelectionButton.layer.masksToBounds = true
+        groupSelectionButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
+        groupSelectionButton.contentHorizontalAlignment = .left
+        groupSelectionStack.addArrangedSubview(groupSelectionButton)
+
+        // post button
         postButton.translatesAutoresizingMaskIntoConstraints = false
         postButton.setTitle("Post", for: .normal)
         postButton.setTitleColor(.white, for: .normal)
@@ -164,14 +412,16 @@ final class PostOptionsViewController: UIViewController {
         container.addSubview(cancelButton)
 
         // Layout constraints
-        // center vertically with adjustable centerY for keyboard
         containerCenterY = container.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: 0)
         containerCenterY?.isActive = true
+
+        groupSelectionHeightConstraint = groupSelectionStack.heightAnchor.constraint(equalToConstant: 0)
+        groupSelectionHeightConstraint?.isActive = true
 
         NSLayoutConstraint.activate([
             container.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.88),
             container.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            container.heightAnchor.constraint(greaterThanOrEqualToConstant: 360),
+            container.heightAnchor.constraint(greaterThanOrEqualToConstant: 400),
 
             headingLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 18),
             headingLabel.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -18),
@@ -196,9 +446,13 @@ final class PostOptionsViewController: UIViewController {
             visibilityButton.topAnchor.constraint(equalTo: yearField.bottomAnchor, constant: 18),
             visibilityButton.heightAnchor.constraint(equalToConstant: 48),
 
+            groupSelectionStack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 18),
+            groupSelectionStack.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -18),
+            groupSelectionStack.topAnchor.constraint(equalTo: visibilityButton.bottomAnchor, constant: 0),
+
             postButton.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 36),
             postButton.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -36),
-            postButton.topAnchor.constraint(equalTo: visibilityButton.bottomAnchor, constant: 22),
+            postButton.topAnchor.constraint(equalTo: groupSelectionStack.bottomAnchor, constant: 22),
             postButton.heightAnchor.constraint(equalToConstant: 56),
 
             cancelButton.topAnchor.constraint(equalTo: postButton.bottomAnchor, constant: 12),
@@ -210,6 +464,7 @@ final class PostOptionsViewController: UIViewController {
     // MARK: Setup Actions
     private func setupActions() {
         visibilityButton.addTarget(self, action: #selector(visibilityTapped), for: .touchUpInside)
+        groupSelectionButton.addTarget(self, action: #selector(groupSelectionTapped), for: .touchUpInside)
         postButton.addTarget(self, action: #selector(postTapped), for: .touchUpInside)
         cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
 
@@ -220,11 +475,618 @@ final class PostOptionsViewController: UIViewController {
         // navigate between fields
         titleField.delegate = self
         yearField.delegate = self
-
-        // tap background to dismiss keyboard handled by dimView in setup
     }
 
-    // MARK: Keyboard handling
+    // MARK: Load User Groups
+    private func loadUserGroups() {
+        Task {
+            do {
+                let groups = try await SupabaseManager.shared.getMyGroups()
+                DispatchQueue.main.async {
+                    self.userGroups = groups
+                    print("✅ Loaded \(groups.count) groups for user")
+                }
+            } catch {
+                print("❌ Failed to load user groups: \(error)")
+            }
+        }
+    }
+
+    // MARK: Update Group Selection Visibility
+    private func updateGroupSelectionVisibility() {
+        print("DEBUG: updateGroupSelectionVisibility called")
+        
+        guard self.view != nil else {
+            print("DEBUG: View is nil, skipping animation")
+            return
+        }
+        
+        let shouldShow = (selectedVisibility == .group)
+        groupSelectionVisible = shouldShow
+        
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else {
+                print("DEBUG: self deallocated")
+                return
+            }
+            
+            guard self.view.window != nil else {
+                print("DEBUG: View not in window hierarchy")
+                return
+            }
+            
+            UIView.animate(withDuration: 0.3) {
+                self.groupSelectionHeightConstraint?.constant = shouldShow ? 80 : 0
+                self.groupSelectionStack.alpha = shouldShow ? 1.0 : 0.0
+                self.groupSelectionStack.isHidden = !shouldShow
+                
+                if self.view.window != nil {
+                    self.view.layoutIfNeeded()
+                }
+            }
+            
+            self.updatePostButtonState()
+        }
+    }
+
+    // MARK: Visibility dropdown
+    @objc private func visibilityTapped() {
+        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
+
+        alert.addAction(UIAlertAction(title: PostVisibility.everyone.title, style: .default, handler: { _ in
+            self.selectedVisibility = .everyone
+            self.scheduleChosen = false
+            self.selectedGroup = nil
+            self.updateGroupSelectionButtonTitle()
+            self.updatePostButtonState()
+        }))
+        alert.addAction(UIAlertAction(title: PostVisibility.private.title, style: .default, handler: { _ in
+            self.selectedVisibility = .private
+            self.scheduleChosen = false
+            self.selectedGroup = nil
+            self.updateGroupSelectionButtonTitle()
+            self.updatePostButtonState()
+        }))
+        alert.addAction(UIAlertAction(title: PostVisibility.scheduledPost.title, style: .default, handler: { _ in
+            self.selectedVisibility = .scheduledPost
+            self.selectedGroup = nil
+            self.updateGroupSelectionButtonTitle()
+            self.presentScheduleDatePicker()
+        }))
+        alert.addAction(UIAlertAction(title: PostVisibility.group.title, style: .default, handler: { _ in
+            self.selectedVisibility = .group
+            self.scheduleChosen = false
+            self.updatePostButtonState()
+        }))
+
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+
+        // For iPad
+        if let p = alert.popoverPresentationController {
+            p.sourceView = visibilityButton
+            p.sourceRect = visibilityButton.bounds
+        }
+
+        present(alert, animated: true)
+    }
+
+    @objc private func groupSelectionTapped() {
+        guard !userGroups.isEmpty else {
+            showAlert(title: "No Groups", message: "You don't have any groups yet. Create or join a group first.")
+            return
+        }
+
+        let alert = UIAlertController(title: "Select Group", message: nil, preferredStyle: .actionSheet)
+        
+        for group in userGroups {
+            let isSelected = selectedGroup?.id == group.id
+            let title = isSelected ? "✓ \(group.name)" : group.name
+            
+            alert.addAction(UIAlertAction(title: title, style: .default, handler: { _ in
+                self.selectedGroup = group
+                self.updateGroupSelectionButtonTitle()
+                self.updatePostButtonState()
+            }))
+        }
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        if let p = alert.popoverPresentationController {
+            p.sourceView = groupSelectionButton
+            p.sourceRect = groupSelectionButton.bounds
+        }
+        
+        present(alert, animated: true)
+    }
+
+    private func updateGroupSelectionButtonTitle() {
+        if let group = selectedGroup {
+            groupSelectionButton.setTitle("Selected: \(group.name)", for: .normal)
+            groupSelectionButton.setTitleColor(.systemBlue, for: .normal)
+        } else {
+            groupSelectionButton.setTitle("Tap to select group", for: .normal)
+            groupSelectionButton.setTitleColor(.secondaryLabel, for: .normal)
+        }
+    }
+
+    // MARK: - Schedule Memory Feature
+    private func presentScheduleDatePicker() {
+        let scheduleVC = ScheduleDatePickerViewController()
+        scheduleVC.modalPresentationStyle = .pageSheet
+        
+        if let sheet = scheduleVC.sheetPresentationController {
+            sheet.detents = [.medium(), .large()]
+            sheet.selectedDetentIdentifier = .medium
+            sheet.prefersGrabberVisible = true
+            sheet.prefersScrollingExpandsWhenScrolledToEdge = false
+        }
+        
+        scheduleVC.onDateSelected = { [weak self] date in
+            self?.selectedScheduleDate = date
+            self?.scheduleChosen = true
+            self?.updateVisibilityButtonTitle()
+            self?.updatePostButtonState()
+            
+            self?.showCapsulePreview(for: date)
+        }
+        
+        present(scheduleVC, animated: true)
+    }
+    
+    private func showCapsulePreview(for date: Date) {
+        let duration = date.timeIntervalSince(Date())
+        let days = Int(duration / 86400)
+        
+        let icon: String
+        let color: UIColor
+        
+        if days >= 365 {
+            icon = "crown.fill"
+            color = UIColor(hex: "#FFD700")
+        } else if days >= 30 {
+            icon = "star.fill"
+            color = UIColor(hex: "#C0C0C0")
+        } else {
+            icon = "heart.fill"
+            color = UIColor(hex: "#CD7F32")
+        }
+        
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateStyle = .long
+        dateFormatter.timeStyle = .short
+        
+        let message = """
+        ✨ Memory Capsule Created ✨
+        
+        📅 Opens: \(dateFormatter.string(from: date))
+        ⏳ Duration: \(formatDuration(duration))
+        
+        Your memory will be locked in a beautiful \(days >= 365 ? "Gold" : days >= 30 ? "Silver" : "Bronze") capsule until then!
+        """
+        
+        let alert = UIAlertController(title: "Capsule Scheduled", message: message, preferredStyle: .alert)
+        
+        let imageView = UIImageView(image: UIImage(systemName: icon))
+        imageView.tintColor = color
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        
+        alert.view.addSubview(imageView)
+        NSLayoutConstraint.activate([
+            imageView.centerXAnchor.constraint(equalTo: alert.view.centerXAnchor),
+            imageView.topAnchor.constraint(equalTo: alert.view.topAnchor, constant: 45),
+            imageView.widthAnchor.constraint(equalToConstant: 40),
+            imageView.heightAnchor.constraint(equalToConstant: 40)
+        ])
+        
+        alert.addAction(UIAlertAction(title: "Got it!", style: .default))
+        
+        present(alert, animated: true)
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let days = Int(duration / 86400)
+        let hours = Int((duration.truncatingRemainder(dividingBy: 86400)) / 3600)
+        
+        if days > 0 {
+            return "\(days) day\(days > 1 ? "s" : "") \(hours) hour\(hours > 1 ? "s" : "")"
+        } else {
+            let minutes = Int((duration.truncatingRemainder(dividingBy: 3600)) / 60)
+            return "\(hours) hour\(hours > 1 ? "s" : "") \(minutes) minute\(minutes > 1 ? "s" : "")"
+        }
+    }
+
+    private func updateVisibilityButtonTitle() {
+        var title = selectedVisibility.title
+        if selectedVisibility == .scheduledPost, scheduleChosen {
+            let f = DateFormatter()
+            f.dateStyle = .medium
+            f.timeStyle = .short
+            title = "Scheduled: \(f.string(from: selectedScheduleDate))"
+        }
+        let att = NSMutableAttributedString(string: title)
+        visibilityButton.setAttributedTitle(att, for: .normal)
+    }
+
+    // MARK: Posting
+    @objc private func postTapped() {
+        guard let titleText = titleField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !titleText.isEmpty else {
+            showValidationError("Please enter a title (required).")
+            return
+        }
+
+        guard let yearText = yearField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !yearText.isEmpty else {
+            showValidationError("Please enter the year (required).")
+            return
+        }
+
+        if yearText.count != 4 || Int(yearText) == nil {
+            showValidationError("Please enter a valid 4-digit year (e.g. 1999).")
+            return
+        }
+
+        if selectedVisibility == .scheduledPost && !scheduleChosen {
+            showValidationError("Please choose a schedule date and time.")
+            return
+        }
+
+        if selectedVisibility == .group && selectedGroup == nil {
+            showValidationError("Please select a group to share with.")
+            return
+        }
+
+        let visibility = selectedVisibility.asMemoryVisibility
+        let scheduleDate = selectedVisibility == .scheduledPost ? selectedScheduleDate : nil
+        let selectedGroupId = selectedGroup
+
+        if SupabaseManager.shared.isUserLoggedIn() {
+            postToSupabaseWithSchedule(
+                title: titleText,
+                year: Int(yearText) ?? 2024,
+                visibility: visibility,
+                scheduleDate: scheduleDate,
+                group: selectedGroupId
+            )
+        } else if let d = delegate {
+            d.postOptionsViewController(self, didFinishPostingWithTitle: titleText, scheduleDate: scheduleDate, visibility: visibility)
+        } else {
+            postToLocalStorage(
+                title: titleText,
+                visibility: visibility,
+                scheduleDate: scheduleDate
+            )
+        }
+    }
+
+    // MARK: Post to Supabase with Schedule Support
+    private func postToSupabaseWithSchedule(
+        title: String,
+        year: Int,
+        visibility: MemoryVisibility,
+        scheduleDate: Date?,
+        group: UserGroup?
+    ) {
+        showSavingOverlay()
+        setControlsEnabled(false)
+        
+        print("DEBUG: Posting to Supabase with:")
+        print("  Title: \(title)")
+        print("  Year: \(year)")
+        print("  Visibility: \(visibility)")
+        print("  Schedule Date: \(scheduleDate?.description ?? "None")")
+        print("  Group: \(group?.name ?? "None")")
+        
+        Task {
+            do {
+                if visibility == .scheduled, let scheduleDate = scheduleDate {
+                    print("DEBUG: Creating scheduled memory...")
+                    
+                    let scheduledMemory = try await SupabaseManager.shared.scheduleMemory(
+                        title: title,
+                        year: year,
+                        category: nil,
+                        releaseDate: scheduleDate,
+                        images: userImages,
+                        audioFiles: userAudioFiles,
+                        textContent: bodyText
+                    )
+                    
+                    print("DEBUG: Scheduled memory created: \(scheduledMemory.id)")
+                    
+                    DispatchQueue.main.async {
+                        self.hideSavingOverlay()
+                        self.setControlsEnabled(true)
+                        
+                        let message = "Memory capsule scheduled! 🎁"
+                        self.showToastAboveOverlay(message: message)
+                        
+                        NotificationCenter.default.post(
+                            name: .memoriesUpdated,
+                            object: nil,
+                            userInfo: ["memoryId": scheduledMemory.id.uuidString]
+                        )
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                            self.dismiss(animated: true, completion: nil)
+                        }
+                    }
+                    return
+                }
+                
+                let memory: SupabaseMemory
+                
+                if let group = group, visibility == .group, let groupId = UUID(uuidString: group.id) {
+                    print("DEBUG: Creating group-specific memory for group: \(group.name)")
+                    
+                    memory = try await SupabaseManager.shared.createMemory(
+                        title: title,
+                        year: year,
+                        visibility: visibility,
+                        scheduledDate: scheduleDate,
+                        images: userImages,
+                        audioFiles: userAudioFiles,
+                        textContent: bodyText
+                    )
+                    
+                    print("DEBUG: Memory created, now sharing with group...")
+                    
+                    try await SupabaseManager.shared.shareMemoryWithGroup(
+                        memoryId: memory.id,
+                        groupId: groupId
+                    )
+                    
+                    print("DEBUG: Group sharing completed")
+                    
+                } else {
+                    print("DEBUG: Creating regular memory")
+                    memory = try await SupabaseManager.shared.createMemory(
+                        title: title,
+                        year: year,
+                        visibility: visibility,
+                        scheduledDate: scheduleDate,
+                        images: userImages,
+                        audioFiles: userAudioFiles,
+                        textContent: bodyText
+                    )
+                    
+                    print("DEBUG: Regular memory created successfully")
+                    
+                    if let group = group, let groupId = UUID(uuidString: group.id) {
+                        print("DEBUG: Sharing regular memory with group: \(group.name)")
+                        try await SupabaseManager.shared.shareMemoryWithGroup(
+                            memoryId: memory.id,
+                            groupId: groupId
+                        )
+                    }
+                }
+                
+                DispatchQueue.main.async {
+                    self.hideSavingOverlay()
+                    self.setControlsEnabled(true)
+                    
+                    let message: String
+                    if group != nil {
+                        message = "Memory shared with \(group!.name) group!"
+                    } else {
+                        message = "Memory posted successfully!"
+                    }
+                    
+                    self.showToastAboveOverlay(message: message)
+                    
+                    NotificationCenter.default.post(
+                        name: .memoriesUpdated,
+                        object: nil,
+                        userInfo: ["memoryId": memory.id.uuidString]
+                    )
+                    
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        self.dismiss(animated: true, completion: nil)
+                    }
+                }
+                
+            } catch {
+                print("Supabase post failed: \(error)")
+                
+                let nsError = error as NSError
+                print("Error domain: \(nsError.domain)")
+                print("Error code: \(nsError.code)")
+                print("Error description: \(nsError.localizedDescription)")
+                
+                DispatchQueue.main.async {
+                    self.hideSavingOverlay()
+                    self.setControlsEnabled(true)
+                    
+                    self.showAlertWithFallbackOption(
+                        title: "Network Error",
+                        message: "Failed to post to server: \(error.localizedDescription)\n\nSave locally instead?",
+                        fallbackAction: {
+                            self.postToLocalStorage(
+                                title: title,
+                                visibility: visibility,
+                                scheduleDate: scheduleDate
+                            )
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: Post to Local Storage (Fallback)
+    private func postToLocalStorage(
+        title: String,
+        visibility: MemoryVisibility,
+        scheduleDate: Date?
+    ) {
+        showSavingOverlay()
+        setControlsEnabled(false)
+        
+        let body = (bodyText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) ? nil : bodyText
+        
+        let ownerId: String = {
+            let raw = Session.shared.currentUser.id
+            if let s = raw as? String { return s }
+            if let u = raw as? UUID { return u.uuidString }
+            return String(describing: raw)
+        }()
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            
+            var memAttachments: [MemoryAttachment] = []
+            let group = DispatchGroup()
+
+            for img in self.userImages {
+                do {
+                    let fname = try MemoryStore.shared.saveImageAttachment(img)
+                    let ma = MemoryAttachment(kind: .image, filename: fname)
+                    memAttachments.append(ma)
+                } catch {
+                    print("PostOptions: failed to save image attachment:", error)
+                }
+            }
+
+            for audio in self.userAudioFiles {
+                do {
+                    let fname = try MemoryStore.shared.saveAudioAttachment(at: audio.url)
+                    let ma = MemoryAttachment(kind: .audio, filename: fname)
+                    memAttachments.append(ma)
+                } catch {
+                    print("PostOptions: failed to save audio attachment:", error)
+                }
+            }
+
+            if !memAttachments.contains(where: { $0.kind == .image }),
+               let fallback = self.promptFallbackImageURL,
+               !fallback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let u = URL(string: fallback),
+               (u.scheme?.starts(with: "http") ?? false) {
+                group.enter()
+                self.downloadImage(from: u, timeout: 15.0) { result in
+                    switch result {
+                    case .success(let img):
+                        do {
+                            let fname = try MemoryStore.shared.saveImageAttachment(img)
+                            let ma = MemoryAttachment(kind: .image, filename: fname)
+                            memAttachments.insert(ma, at: 0)
+                        } catch {
+                            print("PostOptions: failed to save downloaded prompt image:", error)
+                        }
+                    case .failure(let err):
+                        print("PostOptions: couldn't download fallback prompt image:", err)
+                    }
+                    group.leave()
+                }
+            }
+
+            let waitResult = group.wait(timeout: .now() + 20)
+            if waitResult == .timedOut {
+                print("PostOptions: fallback image download timed out")
+            }
+
+            MemoryStore.shared.createMemory(
+                ownerId: ownerId,
+                title: title,
+                body: body,
+                attachments: memAttachments,
+                visibility: visibility,
+                scheduledFor: scheduleDate
+            ) { result in
+                DispatchQueue.main.async {
+                    self.hideSavingOverlay()
+                    self.setControlsEnabled(true)
+                    
+                    switch result {
+                    case .success(let memory):
+                        NotificationCenter.default.post(
+                            name: .memoriesUpdated,
+                            object: nil,
+                            userInfo: ["memoryId": memory.id]
+                        )
+                        
+                        let message = visibility == .scheduled ?
+                            "Memory capsule saved locally 🎁" :
+                            "Memory saved locally"
+                        
+                        self.showToastAboveOverlay(message: message)
+                        
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+                            self.dismiss(animated: true, completion: nil)
+                        }
+                        
+                    case .failure(let err):
+                        self.showValidationError("Failed saving memory: \(err.localizedDescription)")
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Alert with Fallback Option
+    private func showAlertWithFallbackOption(
+        title: String,
+        message: String,
+        fallbackAction: @escaping () -> Void
+    ) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        
+        alert.addAction(UIAlertAction(title: "Save Locally", style: .default) { _ in
+            fallbackAction()
+        })
+        
+        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+
+    // MARK: Update Post Button State
+    private func updatePostButtonState() {
+        let titleOK = !(titleField.text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        let yearText = yearField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let yearOK = (yearText.count == 4 && Int(yearText) != nil)
+
+        let visibilityOK: Bool = {
+            switch selectedVisibility {
+            case .scheduledPost:
+                return scheduleChosen
+            case .group:
+                return selectedGroup != nil
+            default:
+                return true
+            }
+        }()
+
+        let enabled = titleOK && yearOK && visibilityOK
+        postButton.isEnabled = enabled
+        postButton.alpha = enabled ? 1.0 : 0.55
+    }
+
+    // MARK: Helper Methods
+    private func showValidationError(_ message: String) {
+        let a = UIAlertController(title: "Missing info", message: message, preferredStyle: .alert)
+        a.addAction(UIAlertAction(title: "OK", style: .default))
+        present(a, animated: true)
+    }
+
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+
+    @objc private func cancelTapped() {
+        delegate?.postOptionsViewControllerDidCancel(self)
+    }
+
+    @objc private func dismissTapped() {
+        view.endEditing(true)
+    }
+
+    @objc private func textDidChange(_ t: UITextField) {
+        updatePostButtonState()
+    }
+
+    // MARK: Keyboard Handling
     private func addKeyboardObservers() {
         guard !keyboardObserversAdded else { return }
         keyboardObserversAdded = true
@@ -233,6 +1095,7 @@ final class PostOptionsViewController: UIViewController {
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillHide(_:)),
                                                name: UIResponder.keyboardWillHideNotification, object: nil)
     }
+    
     private func removeKeyboardObservers() {
         if keyboardObserversAdded {
             NotificationCenter.default.removeObserver(self)
@@ -247,8 +1110,6 @@ final class PostOptionsViewController: UIViewController {
               let curve = info[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt else { return }
 
         let kbFrame = frameValue.cgRectValue
-        // Move container up so bottom of container is above keyboard by ~12 px
-        // compute overlap in screen coordinates
         let containerFrame = container.convert(container.bounds, to: view)
         let overlap = max(0, (containerFrame.maxY) - (view.bounds.height - kbFrame.height))
         containerCenterY?.constant = -overlap - 12
@@ -270,389 +1131,36 @@ final class PostOptionsViewController: UIViewController {
         }
     }
 
-    // MARK: Visibility dropdown
-    @objc private func visibilityTapped() {
-        let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-
-        alert.addAction(UIAlertAction(title: Visibility.everyone.title, style: .default, handler: { _ in
-            self.selectedVisibility = .everyone
-            self.scheduleChosen = false
-            self.updatePostButtonState()
-        }))
-        alert.addAction(UIAlertAction(title: Visibility.private.title, style: .default, handler: { _ in
-            self.selectedVisibility = .private
-            self.scheduleChosen = false
-            self.updatePostButtonState()
-        }))
-        alert.addAction(UIAlertAction(title: Visibility.schedule.title, style: .default, handler: { _ in
-            self.selectedVisibility = .schedule
-            // present date/time picker sheet after selecting schedule
-            self.presentSchedulePicker()
-        }))
-
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-
-        // For iPad, show as popover anchored to the button
-        if let p = alert.popoverPresentationController {
-            p.sourceView = visibilityButton
-            p.sourceRect = visibilityButton.bounds
-        }
-
-        present(alert, animated: true)
-    }
-
-    private func presentSchedulePicker() {
-        // show a small alert controller with an inline date picker (UIDatePicker)
-        let picker = UIDatePicker()
-        picker.datePickerMode = .dateAndTime
-        picker.preferredDatePickerStyle = .wheels
-        picker.date = selectedScheduleDate
-
-        let alert = UIAlertController(title: "Select schedule date", message: "\n\n\n\n\n\n\n\n\n", preferredStyle: .actionSheet)
-        alert.modalPresentationStyle = .automatic
-        alert.view.addSubview(picker)
-        picker.translatesAutoresizingMaskIntoConstraints = false
-
-        // Pin picker into alert
-        NSLayoutConstraint.activate([
-            picker.leadingAnchor.constraint(equalTo: alert.view.leadingAnchor, constant: 8),
-            picker.trailingAnchor.constraint(equalTo: alert.view.trailingAnchor, constant: -8),
-            picker.topAnchor.constraint(equalTo: alert.view.topAnchor, constant: 8),
-            picker.heightAnchor.constraint(equalToConstant: 200)
-        ])
-
-        alert.addAction(UIAlertAction(title: "Done", style: .default, handler: { _ in
-            self.selectedScheduleDate = picker.date
-            self.scheduleChosen = true
-            self.updateVisibilityButtonTitle()
-            self.updatePostButtonState()
-        }))
-        alert.addAction(UIAlertAction(title: "Cancel", style: .cancel, handler: { _ in
-            // if user cancels schedule selection, revert visibility to Everyone
-            if self.selectedVisibility == .schedule && !self.scheduleChosen {
-                self.selectedVisibility = .everyone
-            }
-            self.updateVisibilityButtonTitle()
-            self.updatePostButtonState()
-        }))
-
-        if let p = alert.popoverPresentationController {
-            p.sourceView = visibilityButton
-            p.sourceRect = visibilityButton.bounds
-        }
-
-        present(alert, animated: true)
-    }
-
-    private func updateVisibilityButtonTitle() {
-        var title = selectedVisibility.title
-        if selectedVisibility == .schedule, scheduleChosen {
-            // show short selected date on button as suffix
-            let f = DateFormatter()
-            f.dateStyle = .medium
-            f.timeStyle = .short
-            title = "\(f.string(from: selectedScheduleDate))"
-        }
-        // Keep it bold-ish and centered
-        let att = NSMutableAttributedString(string: title)
-        visibilityButton.setAttributedTitle(att, for: .normal)
-    }
-
-    // MARK: Posting
-    @objc private func postTapped() {
-        // validate
-        guard let titleText = titleField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !titleText.isEmpty else {
-            showValidationError("Please enter a title (required).")
-            return
-        }
-
-        guard let yearText = yearField.text?.trimmingCharacters(in: .whitespacesAndNewlines), !yearText.isEmpty else {
-            showValidationError("Please enter the year (required).")
-            return
-        }
-
-        // simple 4-digit year check
-        if yearText.count != 4 || Int(yearText) == nil {
-            showValidationError("Please enter a valid 4-digit year (e.g. 1999).")
-            return
-        }
-
-        if selectedVisibility == .schedule && !scheduleChosen {
-            // require schedule date if schedule selected
-            showValidationError("Please choose a schedule date and time.")
-            return
-        }
-
-        // everything ok — either call delegate or persist locally if no delegate
-        let visibility = selectedVisibility.asMemoryVisibility
-        let scheduleDate = selectedVisibility == .schedule ? selectedScheduleDate : nil
-
-        if let d = delegate {
-            // still call delegate so PromptDetailViewControllerSimple can handle posting flow (and attachments handling)
-            d.postOptionsViewController(self, didFinishPostingWithTitle: titleText, scheduleDate: scheduleDate, visibility: visibility)
-            // leave dismissal / navigation to delegate (as before)
-            return
-        }
-
-        guard autoSaveToLocalStoreIfNoDelegate else {
-            // No delegate and auto save disabled: just dismiss
-            dismiss(animated: true, completion: nil)
-            return
-        }
-
-        // Start loader + disable UI
-        showSavingOverlay()
-        setControlsEnabled(false)
-
-        // create local Memory using MemoryStore
-        // Build a title/body; use `bodyText` provided by caller if available.
-        let body = (bodyText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) ? nil : bodyText
-
-        // Owner id — try to use Session.shared.currentUser.id if available.
-        // Be defensive: Session.shared.currentUser.id might be UUID or String. Convert to String safely.
-        let ownerId: String = {
-            let raw = Session.shared.currentUser.id
-            if let s = raw as? String { return s }
-            if let u = raw as? UUID { return u.uuidString }
-            return String(describing: raw)
-        }()
-
-        // We'll perform attachment saving on a background queue.
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-            var memAttachments: [MemoryAttachment] = []
-            let group = DispatchGroup()
-
-            // Save image attachments (bundled images user provided)
-            for img in self.userImages {
-                do {
-                    let fname = try MemoryStore.shared.saveImageAttachment(img)
-                    let ma = MemoryAttachment(kind: .image, filename: fname)
-                    memAttachments.append(ma)
-                } catch {
-                    print("PostOptions: failed to save image attachment:", error)
-                }
-            }
-
-            // Save audio attachments
-            for audio in self.userAudioFiles {
-                do {
-                    let fname = try MemoryStore.shared.saveAudioAttachment(at: audio.url)
-                    let ma = MemoryAttachment(kind: .audio, filename: fname)
-                    memAttachments.append(ma)
-                } catch {
-                    print("PostOptions: failed to save audio attachment:", error)
-                }
-            }
-
-            // If no user images and a prompt fallback URL exists, try downloading and saving it asynchronously
-            if !memAttachments.contains(where: { $0.kind == .image }),
-               let fallback = self.promptFallbackImageURL,
-               !fallback.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               let u = URL(string: fallback),
-               (u.scheme?.starts(with: "http") ?? false) {
-                group.enter()
-                self.downloadImage(from: u, timeout: 15.0) { result in
-                    switch result {
-                    case .success(let img):
-                        do {
-                            let fname = try MemoryStore.shared.saveImageAttachment(img)
-                            let ma = MemoryAttachment(kind: .image, filename: fname)
-                            // put fallback image as first attachment
-                            memAttachments.insert(ma, at: 0)
-                        } catch {
-                            print("PostOptions: failed to save downloaded prompt image:", error)
-                        }
-                    case .failure(let err):
-                        print("PostOptions: couldn't download fallback prompt image:", err)
-                    }
-                    group.leave()
-                }
-            }
-
-            // Wait for any downloads to finish (bounded) before creating memory
-            let waitResult = group.wait(timeout: .now() + 20)
-            if waitResult == .timedOut {
-                print("PostOptions: fallback image download timed out")
-            }
-
-            // Persist via MemoryStore.createMemory (preferred pattern used elsewhere)
-            MemoryStore.shared.createMemory(ownerId: ownerId,
-                                            title: titleText,
-                                            body: body,
-                                            attachments: memAttachments,
-                                            visibility: visibility,
-                                            scheduledFor: scheduleDate) { result in
-                DispatchQueue.main.async { [weak self] in
-                    guard let self = self else { return }
-                    switch result {
-                    case .success(let memory):
-                        // Print the saved memory (pretty JSON if Encodable)
-                        do {
-                            let enc = JSONEncoder()
-                            enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-                            let data = try enc.encode(memory)
-                            if let s = String(data: data, encoding: .utf8) {
-                                print("Memory saved (JSON):\n\(s)")
-                            } else {
-                                print("Memory saved:", memory)
-                            }
-                        } catch {
-                            print("Memory saved:", memory)
-                        }
-
-                        // notify that memories updated
-                        NotificationCenter.default.post(name: .memoriesUpdated, object: nil, userInfo: ["memoryId": memory.id])
-
-                        // Show toast above overlay, keep overlay visible briefly, then hide and navigate back (pop)
-                        self.showToastAboveOverlay(message: "Memory is now posted")
-
-                        // Allow user to see toast briefly, then hide overlay and navigate back.
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
-                            self.hideSavingOverlay()
-                            self.setControlsEnabled(true)
-
-                            // Attempt to pop one screen (go back) instead of forcing Home.
-                            // Strategy: first try to find the presenting navigation controller (if any), else the controller's own nav.
-                            if let nav = Self.findAppropriateNavigationController(startingFrom: self.presentingViewController) {
-                                nav.popViewController(animated: true)
-                                // If the PostOptions was presented modally above a pushed VC, we also dismiss PostOptions.
-                                self.dismiss(animated: true, completion: nil)
-                                return
-                            }
-
-                            if let navSelf = self.navigationController {
-                                navSelf.popViewController(animated: true)
-                                // If PostOptions was presented modally, dismiss it too:
-                                self.dismiss(animated: true, completion: nil)
-                                return
-                            }
-
-                            // Fallback: just dismiss this modal
-                            self.dismiss(animated: true, completion: nil)
-                        }
-
-                    case .failure(let err):
-                        // hide overlay and re-enable controls, then show error
-                        self.hideSavingOverlay()
-                        self.setControlsEnabled(true)
-                        self.showValidationError("Failed saving memory: \(err.localizedDescription)")
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Async image downloader helper
-    private func downloadImage(from url: URL, timeout: TimeInterval = 15.0, completion: @escaping (Result<UIImage, Error>) -> Void) {
-        var req = URLRequest(url: url)
-        req.timeoutInterval = timeout
-        let cfg = URLSessionConfiguration.ephemeral
-        cfg.timeoutIntervalForRequest = timeout
-        cfg.timeoutIntervalForResource = timeout
-        let session = URLSession(configuration: cfg)
-        let task = session.dataTask(with: req) { data, response, error in
-            if let err = error { completion(.failure(err)); return }
-            guard let d = data, let img = UIImage(data: d) else {
-                let err = NSError(domain: "PostOptionsDownload", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid image data"])
-                completion(.failure(err)); return
-            }
-            completion(.success(img))
-        }
-        task.resume()
-    }
-
-    // MARK: UI helpers: loader / toast
-
-    /// Return a robust host view for overlays/toasts (tries scene window, then keyWindow, then topmost view controller view)
-    private func hostWindowView() -> UIView? {
-        // 1) Try to use a foreground window scene's key window (iOS 13+)
-        if #available(iOS 13.0, *) {
-            if let windowScene = UIApplication.shared.connectedScenes
-                .compactMap({ $0 as? UIWindowScene })
-                .first(where: { $0.activationState == .foregroundActive || $0.activationState == .foregroundInactive }) {
-                if let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
-                    return window
-                }
-                // fallback: any visible window
-                if let window = windowScene.windows.first(where: { $0.isHidden == false }) {
-                    return window
-                }
-            }
-        }
-
-        // 2) Fallback to UIApplication windows
-        if let w = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) {
-            return w
-        }
-        if let w = UIApplication.shared.windows.first(where: { $0.isHidden == false }) {
-            return w
-        }
-
-        // 3) Last resort: topmost view controller's view
-        if let top = Self.topMostViewController() {
-            return top.view
-        }
-
-        // 4) Final fallback: self.view (guaranteed non-nil while visible)
-        return self.view
-    }
-
-    /// Return the top most view controller by walking presentedViewController / child controllers
-    private static func topMostViewController() -> UIViewController? {
-        // Try scene/window root
-        if #available(iOS 13.0, *) {
-            if let windowScene = UIApplication.shared.connectedScenes
-                .compactMap({ $0 as? UIWindowScene })
-                .first(where: { $0.activationState == .foregroundActive || $0.activationState == .foregroundInactive }),
-               let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
-                var top = window.rootViewController
-                while let presented = top?.presentedViewController { top = presented }
-                return top
-            }
-        }
-        if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }), let root = window.rootViewController {
-            var top = root
-            while let presented = top.presentedViewController { top = presented }
-            return top
-        }
-        return nil
-    }
-
+    // MARK: Loader and Toast Methods
     private func showSavingOverlay() {
         DispatchQueue.main.async {
-            // avoid adding twice
             if let existing = self.savingOverlay {
                 print("[PostOptions] showSavingOverlay: overlay already present: \(existing)")
                 return
             }
 
             guard let host = self.hostWindowView() else {
-                print("[PostOptions] showSavingOverlay: no host window/view found (shouldn't happen)")
+                print("[PostOptions] showSavingOverlay: no host window/view found")
                 return
             }
 
-            // overlay (blocks interactions underneath)
             let overlay = UIView()
             overlay.backgroundColor = UIColor(white: 0, alpha: 0.35)
             overlay.translatesAutoresizingMaskIntoConstraints = false
             overlay.alpha = 0.0
             overlay.isUserInteractionEnabled = true
 
-            // blurred box container for spinner + label
             let blur = UIBlurEffect(style: .systemMaterial)
             let blurView = UIVisualEffectView(effect: blur)
             blurView.layer.cornerRadius = 12
             blurView.layer.masksToBounds = true
             blurView.translatesAutoresizingMaskIntoConstraints = false
 
-            // spinner
             let indicator = UIActivityIndicatorView(style: .large)
             indicator.translatesAutoresizingMaskIntoConstraints = false
             indicator.startAnimating()
             self.activityIndicator = indicator
 
-            // label
             let lbl = UILabel()
             lbl.translatesAutoresizingMaskIntoConstraints = false
             lbl.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
@@ -685,7 +1193,6 @@ final class PostOptionsViewController: UIViewController {
             self.savingOverlay = overlay
             host.layoutIfNeeded()
             UIView.animate(withDuration: 0.18) { overlay.alpha = 1.0 }
-            print("[PostOptions] showSavingOverlay: added overlay to host: \(String(describing: host))")
         }
     }
 
@@ -701,7 +1208,6 @@ final class PostOptionsViewController: UIViewController {
                 })
             }
             self.savingOverlay = nil
-            print("[PostOptions] hideSavingOverlay: removed overlay")
         }
     }
 
@@ -712,19 +1218,15 @@ final class PostOptionsViewController: UIViewController {
             self.titleField.isEnabled = enabled
             self.yearField.isEnabled = enabled
             self.visibilityButton.isEnabled = enabled
+            self.groupSelectionButton.isEnabled = enabled
             self.postButton.alpha = enabled ? 1.0 : 0.55
         }
     }
 
-    /// Shows a toast above the overlay (sliding animation)
     private func showToastAboveOverlay(message: String) {
         DispatchQueue.main.async {
-            guard let host = self.hostWindowView() else {
-                print("[PostOptions] showToastAboveOverlay: no host window found")
-                return
-            }
+            guard let host = self.hostWindowView() else { return }
 
-            // create toast
             let toast = UILabel()
             toast.translatesAutoresizingMaskIntoConstraints = false
             toast.backgroundColor = UIColor(white: 0, alpha: 0.85)
@@ -739,7 +1241,6 @@ final class PostOptionsViewController: UIViewController {
             host.addSubview(toast)
 
             let safe = host.safeAreaLayoutGuide
-            // initial offscreen constraint
             let centerX = toast.centerXAnchor.constraint(equalTo: host.centerXAnchor)
             let bottom = toast.bottomAnchor.constraint(equalTo: safe.bottomAnchor, constant: 80)
             NSLayoutConstraint.activate([
@@ -750,13 +1251,11 @@ final class PostOptionsViewController: UIViewController {
             ])
             host.layoutIfNeeded()
 
-            // animate up
             bottom.constant = -48
             UIView.animate(withDuration: 0.28, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.6, options: [], animations: {
                 toast.alpha = 1.0
                 host.layoutIfNeeded()
             }, completion: { _ in
-                // visible for a moment then slide down
                 UIView.animate(withDuration: 0.22, delay: 1.0, options: [], animations: {
                     toast.alpha = 0.0
                     bottom.constant = 80
@@ -765,107 +1264,54 @@ final class PostOptionsViewController: UIViewController {
                     toast.removeFromSuperview()
                 })
             })
-            print("[PostOptions] showToastAboveOverlay: toast shown")
         }
     }
 
-    // Helper: attempt to find a navigation controller by walking presenting chain or inspecting view controllers
-    private static func findAppropriateNavigationController(startingFrom vc: UIViewController?) -> UINavigationController? {
-        var cur = vc
-        // Walk up the presenting chain and check for navigation controllers or navigationController property
-        while let c = cur {
-            if let nav = c as? UINavigationController { return nav }
-            if let nav = c.navigationController { return nav }
-            cur = c.presentingViewController
-        }
-        return nil
-    }
-
-    // Helper: best-effort root navigation controller fallback (scene-aware)
-    private static func rootNavigationControllerFallback() -> UINavigationController? {
-        // iOS 13+ scene-safe way
+    private func hostWindowView() -> UIView? {
         if #available(iOS 13.0, *) {
-            let scenes = UIApplication.shared.connectedScenes
-            for scene in scenes {
-                if scene.activationState == .foregroundActive || scene.activationState == .foregroundInactive {
-                    if let windowScene = scene as? UIWindowScene {
-                        for window in windowScene.windows where window.isKeyWindow {
-                            if let nav = window.rootViewController as? UINavigationController { return nav }
-                            if let tab = window.rootViewController as? UITabBarController, let nav = tab.viewControllers?.first as? UINavigationController { return nav }
-                        }
-                    }
+            if let windowScene = UIApplication.shared.connectedScenes
+                .compactMap({ $0 as? UIWindowScene })
+                .first(where: { $0.activationState == .foregroundActive || $0.activationState == .foregroundInactive }) {
+                if let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
+                    return window
+                }
+                if let window = windowScene.windows.first(where: { $0.isHidden == false }) {
+                    return window
                 }
             }
         }
-        // Fallback to deprecated keyWindow (works in many cases)
-        if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) {
-            if let nav = window.rootViewController as? UINavigationController { return nav }
-            if let tab = window.rootViewController as? UITabBarController, let nav = tab.viewControllers?.first as? UINavigationController { return nav }
+
+        if let w = UIApplication.shared.windows.first(where: { $0.isKeyWindow }) {
+            return w
         }
-        return nil
+        if let w = UIApplication.shared.windows.first(where: { $0.isHidden == false }) {
+            return w
+        }
+
+        if let top = Self.topMostViewController() {
+            return top.view
+        }
+
+        return self.view
     }
 
-    // Helper: dismiss all presented view controllers starting from the app root (robust)
-    private func dismissEntirePresentedStack(completion: (() -> Void)? = nil) {
-        // Try scene-aware key window first (iOS 13+)
+    private static func topMostViewController() -> UIViewController? {
         if #available(iOS 13.0, *) {
             if let windowScene = UIApplication.shared.connectedScenes
                 .compactMap({ $0 as? UIWindowScene })
                 .first(where: { $0.activationState == .foregroundActive || $0.activationState == .foregroundInactive }),
-               let window = windowScene.windows.first(where: { $0.isKeyWindow }),
-               let root = window.rootViewController {
-                // Dismissing root will dismiss any presented view controllers on top of it.
-                root.dismiss(animated: true, completion: completion)
-                return
+               let window = windowScene.windows.first(where: { $0.isKeyWindow }) {
+                var top = window.rootViewController
+                while let presented = top?.presentedViewController { top = presented }
+                return top
             }
         }
-
-        // Fallback to UIApplication.windows
-        if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }),
-           let root = window.rootViewController {
-            root.dismiss(animated: true, completion: completion)
-            return
+        if let window = UIApplication.shared.windows.first(where: { $0.isKeyWindow }), let root = window.rootViewController {
+            var top = root
+            while let presented = top.presentedViewController { top = presented }
+            return top
         }
-
-        // Last resort: dismiss this controller only
-        self.dismiss(animated: true, completion: completion)
-    }
-
-    private func showValidationError(_ message: String) {
-        let a = UIAlertController(title: "Missing info", message: message, preferredStyle: .alert)
-        a.addAction(UIAlertAction(title: "OK", style: .default))
-        present(a, animated: true)
-    }
-
-    @objc private func cancelTapped() {
-        delegate?.postOptionsViewControllerDidCancel(self)
-    }
-
-    @objc private func dismissTapped() {
-        view.endEditing(true)
-    }
-
-    // MARK: Text events
-    @objc private func textDidChange(_ t: UITextField) {
-        updatePostButtonState()
-    }
-
-    private func updatePostButtonState() {
-        // simple validation: title non-empty and year 4-digit numeric
-        let titleOK = !(titleField.text?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
-        let yearText = yearField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        let yearOK = (yearText.count == 4 && Int(yearText) != nil)
-
-        let visibilityOK: Bool = {
-            if selectedVisibility == .schedule {
-                return scheduleChosen
-            }
-            return true
-        }()
-
-        let enabled = titleOK && yearOK && visibilityOK
-        postButton.isEnabled = enabled
-        postButton.alpha = enabled ? 1.0 : 0.55
+        return nil
     }
 }
 
@@ -881,7 +1327,23 @@ extension PostOptionsViewController: UITextFieldDelegate {
     }
 }
 
-// MARK: - Notification name helper
-extension Notification.Name {
-    static let memoriesUpdated = Notification.Name("memoriesUpdatedNotification")
+// MARK: - Async image downloader helper
+extension PostOptionsViewController {
+    private func downloadImage(from url: URL, timeout: TimeInterval = 15.0, completion: @escaping (Result<UIImage, Error>) -> Void) {
+        var req = URLRequest(url: url)
+        req.timeoutInterval = timeout
+        let cfg = URLSessionConfiguration.ephemeral
+        cfg.timeoutIntervalForRequest = timeout
+        cfg.timeoutIntervalForResource = timeout
+        let session = URLSession(configuration: cfg)
+        let task = session.dataTask(with: req) { data, response, error in
+            if let err = error { completion(.failure(err)); return }
+            guard let d = data, let img = UIImage(data: d) else {
+                let err = NSError(domain: "PostOptionsDownload", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid image data"])
+                completion(.failure(err)); return
+            }
+            completion(.success(img))
+        }
+        task.resume()
+    }
 }

@@ -48,69 +48,27 @@ final class MemoryCollectionViewCell: UICollectionViewCell {
         delegate?.memoryCollectionViewCellDidTap(self)
     }
 
-    /// Configure the cell with a Memory — only loads the first image attachment (if any).
-    func configure(with memory: Memory, placeholder: UIImage? = nil) {
-        // default placeholder
-        iconImageView.image = placeholder ?? UIImage(systemName: "photo")
-
-        // find the first image attachment
-        let imageAttachments = memory.attachments.filter { $0.kind == .image }
-        guard let first = imageAttachments.first else {
-            currentlyLoadingFilename = nil
-            return
-        }
-
-        let filename = first.filename.trimmingCharacters(in: .whitespacesAndNewlines)
-        currentlyLoadingFilename = filename
-
-        // Try local file first
-        let localURL = MemoryStore.shared.urlForAttachment(filename: filename)
-        if FileManager.default.fileExists(atPath: localURL.path) {
-            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                guard let self = self else { return }
-                let img = UIImage(contentsOfFile: localURL.path)
-                DispatchQueue.main.async {
-                    guard self.currentlyLoadingFilename == filename else { return }
-                    self.iconImageView.image = img ?? (placeholder ?? UIImage(systemName: "photo"))
-                }
-            }
-            return
-        }
-
-        // If filename is an http(s) URL, try to load remotely
-        if let url = URL(string: filename), (url.scheme?.hasPrefix("http") ?? false) {
-            // Use project's ImageLoader if available
-            if let _ = NSClassFromString("ImageLoader") {
-                // call through to ImageLoader API used in the project
-                ImageLoader.shared.loadImage(from: filename) { [weak self] img in
+    
+    /// Configure the cell with a SupabaseMemory — loads from memory_media
+    func configure(with supabaseMemory: SupabaseMemory) {
+        iconImageView.image = UIImage(systemName: "photo")
+        
+        // Check if we have media
+        if let imageMedia = supabaseMemory.memoryMedia?.first(where: { $0.mediaType == "photo" }) {
+            let imageUrl = imageMedia.mediaUrl.trimmingCharacters(in: .whitespacesAndNewlines)
+            
+            if let url = URL(string: imageUrl) {
+                ImageLoader.shared.load(from: url) { [weak self] image in
                     DispatchQueue.main.async {
-                        guard let self = self, self.currentlyLoadingFilename == filename else { return }
-                        self.iconImageView.image = img ?? (placeholder ?? UIImage(systemName: "photo"))
+                        self?.iconImageView.image = image ?? UIImage(systemName: "photo")
                     }
                 }
-                return
-            } else {
-                // fallback simple fetch (not ideal for production)
-                DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-                    guard let self = self else { return }
-                    if let data = try? Data(contentsOf: url), let img = UIImage(data: data) {
-                        DispatchQueue.main.async {
-                            guard self.currentlyLoadingFilename == filename else { return }
-                            self.iconImageView.image = img
-                        }
-                    } else {
-                        DispatchQueue.main.async {
-                            guard self.currentlyLoadingFilename == filename else { return }
-                            self.iconImageView.image = placeholder ?? UIImage(systemName: "photo")
-                        }
-                    }
-                }
-                return
             }
+        } else {
+            // No image media found
+            iconImageView.image = UIImage(systemName: "photo")
         }
-
-        // Not local and not http(s) — clear to placeholder
-        currentlyLoadingFilename = nil
-        iconImageView.image = placeholder ?? UIImage(systemName: "photo")
     }
 }
+
+

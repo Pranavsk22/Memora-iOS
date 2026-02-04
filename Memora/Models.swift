@@ -136,6 +136,7 @@ struct GroupMemory: Codable, Identifiable {
     let category: String?
     let createdAt: Date
     let userName: String?
+    let memoryMedia: [SupabaseMemoryMedia]?
     
     enum CodingKeys: String, CodingKey {
         case id, title, content, year, category
@@ -145,6 +146,7 @@ struct GroupMemory: Codable, Identifiable {
         case mediaType = "media_type"
         case createdAt = "created_at"
         case userName = "user_name"
+        case memoryMedia = "memory_media"
     }
 }
 
@@ -183,5 +185,168 @@ struct CreateJoinRequest: Codable {
     enum CodingKeys: String, CodingKey {
         case groupId = "group_id"
         case userId = "user_id"
+    }
+}
+
+
+
+// MARK: - Memory Models for Supabase
+struct SupabaseMemory: Codable, Identifiable {
+    let id: UUID
+    let userId: UUID
+    let title: String
+    let year: Int?
+    let category: String?
+    let visibility: String
+    let releaseAt: Date?
+    let createdAt: Date
+    let updatedAt: Date
+    
+    // ADD THIS: Memory media array (optional for backward compatibility)
+    let memoryMedia: [SupabaseMemoryMedia]?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case title
+        case year
+        case category
+        case visibility
+        case releaseAt = "release_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case memoryMedia = "memory_media"
+    }
+}
+
+struct SupabaseMemoryMedia: Codable, Identifiable {
+    let id: UUID
+    let memoryId: UUID?
+    let mediaUrl: String
+    let mediaType: String
+    let textContent: String?
+    let sortOrder: Int
+    let createdAt: Date
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case memoryId = "memory_id"
+        case mediaUrl = "media_url"
+        case mediaType = "media_type"
+        case textContent = "text_content"
+        case sortOrder = "sort_order"
+        case createdAt = "created_at"
+    }
+}
+
+struct SupabaseMemoryGroupAccess: Codable, Identifiable {
+    let id: UUID
+    let memoryId: UUID
+    let groupId: UUID
+    let grantedAt: Date
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case memoryId = "memory_id"
+        case groupId = "group_id"
+        case grantedAt = "granted_at"
+    }
+}
+
+struct SupabaseGroupMemory: Codable, Identifiable {
+    let id: UUID
+    let userId: UUID?
+    let groupId: UUID
+    let memoryId: UUID
+    let createdAt: Date
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId = "user_id"
+        case groupId = "group_id"
+        case memoryId = "memory_id"
+        case createdAt = "created_at"
+    }
+}
+
+
+
+// MARK: - Request Models for Creating Memories
+struct CreateMemoryRequest: Codable {
+    let title: String
+    let year: Int?
+    let category: String?
+    let visibility: String
+    let releaseAt: Date?
+    
+    enum CodingKeys: String, CodingKey {
+        case title
+        case year
+        case category
+        case visibility
+        case releaseAt = "release_at"
+    }
+}
+
+struct CreateMemoryMediaRequest: Codable {
+    let memoryId: UUID
+    let mediaUrl: String
+    let mediaType: String
+    let textContent: String?
+    let sortOrder: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case memoryId = "memory_id"
+        case mediaUrl = "media_url"
+        case mediaType = "media_type"
+        case textContent = "text_content"
+        case sortOrder = "sort_order"
+    }
+}
+
+
+// MARK: - Enhanced Memory Models with Groups
+struct MemoryWithGroups: Codable, Identifiable {
+    let memory: SupabaseMemory
+    let media: [SupabaseMemoryMedia]
+    let groups: [UserGroup]  // Groups this memory is shared with
+    let isOwner: Bool
+    
+    var id: UUID { memory.id }
+    var title: String { memory.title }
+    var userId: UUID { memory.userId }
+    var visibility: String { memory.visibility }
+    var createdAt: Date { memory.createdAt }
+}
+
+// MARK: - Group Memory View Model
+struct GroupMemoryViewModel: Identifiable {
+    let id: UUID
+    let title: String
+    let content: String?
+    let imageUrl: String?
+    let audioUrl: String?
+    let userName: String?
+    let userAvatar: String?
+    let createdAt: Date
+    let isOwnMemory: Bool
+    
+    init(from memory: SupabaseMemory, media: [SupabaseMemoryMedia] = [], userName: String? = nil) {
+        self.id = memory.id
+        self.title = memory.title
+        self.createdAt = memory.createdAt
+        self.isOwnMemory = SupabaseManager.shared.getCurrentUserId() == memory.userId.uuidString
+        
+        // Extract content from text media
+        self.content = media.first { $0.mediaType == "text" }?.textContent
+        
+        // Extract image URL
+        self.imageUrl = media.first { $0.mediaType == "photo" }?.mediaUrl
+        
+        // Extract audio URL
+        self.audioUrl = media.first { $0.mediaType == "audio" }?.mediaUrl
+        
+        self.userName = userName
+        self.userAvatar = nil // You can add avatar support later
     }
 }
