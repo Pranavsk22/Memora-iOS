@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24412" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="CWM-RA-sAT">
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24506" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="CWM-RA-sAT">
     <device id="retina6_12" orientation="portrait" appearance="light"/>
     <dependencies>
-        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24405"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24504"/>
         <capability name="Safe area layout guides" minToolsVersion="9.0"/>
         <capability name="System colors in document resources" minToolsVersion="11.0"/>
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
@@ -24,7 +24,7 @@
             </objects>
             <point key="canvasLocation" x="116.79389312977099" y="953.52112676056345"/>
         </scene>
-        <!--Family-->
+        <!--Groups-->
         <scene sceneID="vOZ-6h-yDQ">
             <objects>
                 <viewController id="MER-jq-DSA" sceneMemberID="viewController">
@@ -34,7 +34,7 @@
                         <viewLayoutGuide key="safeArea" id="WnO-6k-3YF"/>
                         <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                     </view>
-                    <tabBarItem key="tabBarItem" title="Family" image="person.2.fill" catalog="system" id="l0X-7c-ewc"/>
+                    <tabBarItem key="tabBarItem" title="Groups" image="person.2.fill" catalog="system" id="l0X-7c-ewc"/>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="BN5-vK-esc" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
             </objects>
@@ -99,7 +99,7 @@
         <scene sceneID="noe-fo-mfw">
             <objects>
                 <navigationController automaticallyAdjustsScrollViewInsets="NO" id="rR2-L9-coN" sceneMemberID="viewController">
-                    <tabBarItem key="tabBarItem" title="Memories" image="person.crop.circle" catalog="system" id="qF7-F3-KMj"/>
+                    <tabBarItem key="tabBarItem" title="Memories" image="bookmark.circle" catalog="system" id="qF7-F3-KMj"/>
                     <toolbarItems/>
                     <navigationBar key="navigationBar" contentMode="scaleToFill" id="Orl-HG-4Fl">
                         <rect key="frame" x="0.0" y="118" width="393" height="54"/>
@@ -623,9 +623,9 @@ Memora</string>
         <image name="Multimedia" width="290" height="245"/>
         <image name="Scheduling" width="290" height="245"/>
         <image name="applogo" width="500" height="500"/>
+        <image name="bookmark.circle" catalog="system" width="128" height="123"/>
         <image name="house.fill" catalog="system" width="128" height="104"/>
         <image name="person.2.fill" catalog="system" width="128" height="86"/>
-        <image name="person.crop.circle" catalog="system" width="128" height="123"/>
         <systemColor name="systemBackgroundColor">
             <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
         </systemColor>
