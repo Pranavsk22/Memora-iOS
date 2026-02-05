@@ -17,6 +17,38 @@ final class GroupsContainerViewController: UIViewController {
         embedGroupsXIB()
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+
+        navigationController?.navigationBar.prefersLargeTitles = true
+        navigationItem.largeTitleDisplayMode = .always
+
+        let profileItem = UIBarButtonItem(
+            image: UIImage(systemName: "person.circle"),
+            style: .plain,
+            target: self,
+            action: #selector(didTapProfile)
+        )
+        profileItem.tintColor = .label
+        navigationItem.rightBarButtonItem = profileItem
+    }
+
+    @objc private func didTapProfile() {
+        let vc = AccountModalViewController()
+        vc.title = "Account"
+
+        let nav = UINavigationController(rootViewController: vc)
+        nav.modalPresentationStyle = .pageSheet
+        nav.navigationBar.prefersLargeTitles = true
+
+        if let sheet = nav.sheetPresentationController {
+            sheet.prefersGrabberVisible = true
+            sheet.preferredCornerRadius = 24
+        }
+
+        present(nav, animated: true)
+    }
+
     private func embedGroupsXIB() {
         let vc = GroupsListViewController(
             nibName: "GroupsListViewController",
