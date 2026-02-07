@@ -574,41 +574,41 @@ final class PostOptionsViewController: UIViewController {
     // MARK: Visibility dropdown
     @objc private func visibilityTapped() {
         let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
-
-        alert.addAction(UIAlertAction(title: PostVisibility.everyone.title, style: .default, handler: { _ in
+        
+        alert.addAction(UIAlertAction(title: "Everyone", style: .default, handler: { _ in
             self.selectedVisibility = .everyone
             self.scheduleChosen = false
             self.selectedGroups = []
-            self.updateGroupSelectionButtonTitle()
-            self.updatePostButtonState()
+            self.updateGroupSelectionVisibility()
         }))
-        alert.addAction(UIAlertAction(title: PostVisibility.private.title, style: .default, handler: { _ in
+        
+        alert.addAction(UIAlertAction(title: "Private", style: .default, handler: { _ in
             self.selectedVisibility = .private
             self.scheduleChosen = false
             self.selectedGroups = []
-            self.updateGroupSelectionButtonTitle()
-            self.updatePostButtonState()
+            self.updateGroupSelectionVisibility()
         }))
-        alert.addAction(UIAlertAction(title: PostVisibility.scheduledPost.title, style: .default, handler: { _ in
-            self.selectedVisibility = .scheduledPost
-            self.selectedGroups = []  // Changed from selectedGroups = nil
-            self.updateGroupSelectionButtonTitle()
-            self.presentScheduleDatePicker()
-        }))
-        alert.addAction(UIAlertAction(title: PostVisibility.group.title, style: .default, handler: { _ in
+        
+        alert.addAction(UIAlertAction(title: "Group", style: .default, handler: { _ in
             self.selectedVisibility = .group
             self.scheduleChosen = false
-            self.updatePostButtonState()
+            self.updateGroupSelectionVisibility()
         }))
-
+        
+        // UPDATED: Scheduled option
+        alert.addAction(UIAlertAction(title: "Schedule", style: .default, handler: { _ in
+            self.selectedVisibility = .scheduledPost
+            // Show schedule date picker immediately
+            self.presentScheduleDatePicker()
+        }))
+        
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
-
-        // For iPad
+        
         if let p = alert.popoverPresentationController {
             p.sourceView = visibilityButton
             p.sourceRect = visibilityButton.bounds
         }
-
+        
         present(alert, animated: true)
     }
 
@@ -649,58 +649,70 @@ final class PostOptionsViewController: UIViewController {
 
     // MARK: - Schedule Memory Feature
     private func presentScheduleDatePicker() {
-        let scheduleVC = ScheduleDatePickerViewController()
+        let scheduleVC = EnhancedScheduleDatePickerViewController()
+        scheduleVC.userGroups = userGroups  // Pass user's groups
+        
         scheduleVC.modalPresentationStyle = .pageSheet
         
         if let sheet = scheduleVC.sheetPresentationController {
             sheet.detents = [.medium(), .large()]
             sheet.selectedDetentIdentifier = .medium
             sheet.prefersGrabberVisible = true
-            sheet.prefersScrollingExpandsWhenScrolledToEdge = false
         }
         
-        scheduleVC.onDateSelected = { [weak self] date in
+        scheduleVC.onScheduleComplete = { [weak self] date, selectedGroups in
             self?.selectedScheduleDate = date
+            self?.selectedGroups = selectedGroups
             self?.scheduleChosen = true
             self?.updateVisibilityButtonTitle()
             self?.updatePostButtonState()
             
-            self?.showCapsulePreview(for: date)
+            self?.showCapsulePreview(for: date, groups: selectedGroups)
         }
         
         present(scheduleVC, animated: true)
     }
     
-    private func showCapsulePreview(for date: Date) {
+    
+    private func showCapsulePreview(for date: Date, groups: [UserGroup]) {
         let duration = date.timeIntervalSince(Date())
         let days = Int(duration / 86400)
         
         let icon: String
         let color: UIColor
+        let capsuleType: String
         
         if days >= 365 {
             icon = "crown.fill"
             color = UIColor(hex: "#FFD700")
+            capsuleType = "Gold Capsule"
         } else if days >= 30 {
             icon = "star.fill"
             color = UIColor(hex: "#C0C0C0")
+            capsuleType = "Silver Capsule"
         } else {
             icon = "heart.fill"
             color = UIColor(hex: "#CD7F32")
+            capsuleType = "Bronze Capsule"
         }
         
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .long
         dateFormatter.timeStyle = .short
         
-        let message = """
-        ✨ Memory Capsule Created ✨
+        var message = """
+        ✨ Group Memory Capsule Created ✨
         
         📅 Opens: \(dateFormatter.string(from: date))
         ⏳ Duration: \(formatDuration(duration))
-        
-        Your memory will be locked in a beautiful \(days >= 365 ? "Gold" : days >= 30 ? "Silver" : "Bronze") capsule until then!
         """
+        
+        if !groups.isEmpty {
+            let groupNames = groups.map { $0.name }.joined(separator: ", ")
+            message += "\n\n👥 Shared with: \(groupNames)"
+        }
+        
+        message += "\n\nYour memory will be locked in a beautiful \(capsuleType) until then!"
         
         let alert = UIAlertController(title: "Capsule Scheduled", message: message, preferredStyle: .alert)
         
@@ -802,7 +814,7 @@ final class PostOptionsViewController: UIViewController {
         year: Int,
         visibility: MemoryVisibility,
         scheduleDate: Date?,
-        groups: [UserGroup]  // Parameter named 'groups'
+        groups: [UserGroup]
     ) {
         showSavingOverlay()
         setControlsEnabled(false)
@@ -819,15 +831,35 @@ final class PostOptionsViewController: UIViewController {
                 if visibility == .scheduled, let scheduleDate = scheduleDate {
                     print("DEBUG: Creating scheduled memory...")
                     
-                    let scheduledMemory = try await SupabaseManager.shared.scheduleMemory(
-                        title: title,
-                        year: year,
-                        category: nil,
-                        releaseDate: scheduleDate,
-                        images: userImages,
-                        audioFiles: userAudioFiles,
-                        textContent: bodyText
-                    )
+                    // Convert group IDs
+                    let groupIds = groups.compactMap { UUID(uuidString: $0.id) }
+                    
+                    let scheduledMemory: ScheduledMemory
+                    
+                    if !groupIds.isEmpty {
+                        // Schedule memory for groups
+                        scheduledMemory = try await SupabaseManager.shared.scheduleMemoryForGroups(
+                            title: title,
+                            year: year,
+                            category: nil,
+                            releaseDate: scheduleDate,
+                            groupIds: groupIds,
+                            images: userImages,
+                            audioFiles: userAudioFiles,
+                            textContent: bodyText
+                        )
+                    } else {
+                        // Schedule memory for self only
+                        scheduledMemory = try await SupabaseManager.shared.scheduleMemory(
+                            title: title,
+                            year: year,
+                            category: nil,
+                            releaseDate: scheduleDate,
+                            images: userImages,
+                            audioFiles: userAudioFiles,
+                            textContent: bodyText
+                        )
+                    }
                     
                     print("DEBUG: Scheduled memory created: \(scheduledMemory.id)")
                     
@@ -835,9 +867,17 @@ final class PostOptionsViewController: UIViewController {
                         self.hideSavingOverlay()
                         self.setControlsEnabled(true)
                         
-                        let message = "Memory capsule scheduled! 🎁"
+                        let message: String
+                        if !groups.isEmpty {
+                            let groupNames = groups.map { $0.name }.joined(separator: ", ")
+                            message = "Memory capsule scheduled for \(groups.count) group\(groups.count == 1 ? "" : "s")! 🎁"
+                        } else {
+                            message = "Memory capsule scheduled! 🎁"
+                        }
+                        
                         self.showToastAboveOverlay(message: message)
                         
+                        // Post notification
                         NotificationCenter.default.post(
                             name: .memoriesUpdated,
                             object: nil,
@@ -851,11 +891,11 @@ final class PostOptionsViewController: UIViewController {
                     return
                 }
                 
+                // Handle non-scheduled memories
                 let memory: SupabaseMemory
-
-                // FIX 1: Change 'selectedGroups' to 'groups' (the parameter)
-                if !groups.isEmpty, visibility == .group {
-                    let groupIds = groups.compactMap { UUID(uuidString: $0.id) }  // Use 'groups' parameter
+                
+                if !groups.isEmpty && visibility == .group {
+                    let groupIds = groups.compactMap { UUID(uuidString: $0.id) }
                     
                     memory = try await SupabaseManager.shared.createMemory(
                         title: title,
@@ -882,17 +922,6 @@ final class PostOptionsViewController: UIViewController {
                         audioFiles: userAudioFiles,
                         textContent: bodyText
                     )
-                    
-                    // FIX 2: Remove this block since we're using 'groups' parameter now
-                    // This old code is trying to use a variable 'group' that doesn't exist
-                    // Delete lines 875-882:
-                    // if let group = group, let groupId = UUID(uuidString: group.id) {
-                    //     print("DEBUG: Sharing regular memory with group: \(group.name)")
-                    //     try await SupabaseManager.shared.shareMemoryWithGroup(
-                    //         memoryId: memory.id,
-                    //         groupId: groupId
-                    //     )
-                    // }
                 }
                 
                 DispatchQueue.main.async {
@@ -900,7 +929,7 @@ final class PostOptionsViewController: UIViewController {
                     self.setControlsEnabled(true)
                     
                     let message: String
-                    if !groups.isEmpty {  // Use 'groups' parameter
+                    if !groups.isEmpty {
                         let groupNames = groups.map { $0.name }.joined(separator: ", ")
                         message = "Memory shared with \(groups.count) group\(groups.count == 1 ? "" : "s")!"
                     } else {
