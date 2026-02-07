@@ -12,11 +12,6 @@ final class MemoryViewController: UIViewController {
     @IBOutlet weak var privateCollectionView: UICollectionView!
     @IBOutlet weak var sharedCollectionView: UICollectionView!
     
-    // MARK: - Scheduled Memories Outlets (UNCOMMENT AND CONNECT THESE IN XIB)
-    @IBOutlet weak var scheduledContainerView: UIView!
-    @IBOutlet weak var scheduledLabel: UILabel!
-    @IBOutlet weak var scheduledCollectionView: UICollectionView!
-    @IBOutlet weak var noScheduledMemoriesView: UIView!
 
     // MARK: - Config
     private let recentCellReuseId = "RecentCell"
@@ -75,12 +70,7 @@ final class MemoryViewController: UIViewController {
         super.viewDidLoad()
         
         print("=== DEBUG: MemoryViewController Outlets ===")
-        print("scheduledContainerView: \(scheduledContainerView != nil)")
-        print("scheduledCollectionView: \(scheduledCollectionView != nil)")
-        print("scheduledLabel: \(scheduledLabel != nil)")
-        print("noScheduledMemoriesView: \(noScheduledMemoriesView != nil)")
-        
-        
+
         setupNavigationBar()
         setupPremiumCardTap()
 
@@ -90,8 +80,6 @@ final class MemoryViewController: UIViewController {
         setupCollectionView(privateCollectionView, isRecent: false)
         setupCollectionView(sharedCollectionView, isRecent: false)
         
-        // Setup scheduled memories section
-        setupScheduledMemoriesSection()
 
         // Add long-press gesture recognizers
         let privateLong = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
@@ -114,63 +102,18 @@ final class MemoryViewController: UIViewController {
         // initial load
         reloadFromStore()
         
-        // Load scheduled memories
-        loadScheduledMemories()
-        
+
         // Request notification permissions
         requestNotificationPermissions()
         
-        // Start countdown timer
-        startCountdownTimer()
+        
     }
     
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        
-        // Check scheduled collection view after view appears
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.checkScheduledCollectionView()
-        }
     }
 
-    private func checkScheduledCollectionView() {
-        print("=== CHECK: Scheduled Collection View ===")
-        
-        guard let scheduledCollectionView = scheduledCollectionView else {
-            print("❌ scheduledCollectionView is nil")
-            return
-        }
-        
-        print("Frame: \(scheduledCollectionView.frame)")
-        print("Bounds: \(scheduledCollectionView.bounds)")
-        print("Content size: \(scheduledCollectionView.contentSize)")
-        print("Visible cells: \(scheduledCollectionView.visibleCells.count)")
-        print("Is hidden: \(scheduledCollectionView.isHidden)")
-        print("Alpha: \(scheduledCollectionView.alpha)")
-        
-        // Check container
-        if let container = scheduledContainerView {
-            print("Container frame: \(container.frame)")
-            print("Container is hidden: \(container.isHidden)")
-            print("Container bounds: \(container.bounds)")
-            
-            container.isHidden = false
-            print("🔄 Forced container.isHidden = false")
-            
-            
-        }
-        
-        // Check number of items
-        let itemCount = scheduledVisibilityMemories.count
-        print("Scheduled memories count: \(itemCount)")
-        
-       
-        
-        // If still not visible, check constraints
-        print("Collection view constraints: \(scheduledCollectionView.constraints)")
-        print("Superview constraints: \(scheduledCollectionView.superview?.constraints ?? [])")
-    }
 
     private func setupNavigationBar() {
         self.title = "Memories"
@@ -193,7 +136,6 @@ final class MemoryViewController: UIViewController {
         navigationController?.navigationBar.prefersLargeTitles = true
         navigationItem.largeTitleDisplayMode = .always
         
-        loadScheduledMemories()
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -230,16 +172,6 @@ final class MemoryViewController: UIViewController {
 
         // DEBUG: Check what nib files exist
         print("=== DEBUG: Setting up collection view ===")
-        if cv == scheduledCollectionView {
-            print("Setting up scheduledCollectionView")
-            
-            // Check what nib files exist (for debugging only)
-            let nibNames = ["MemoryCapsuleCell", "CapsuleCell", "MemoryCapsuleCollectionViewCell"]
-            for nibName in nibNames {
-                let nibPath = Bundle.main.path(forResource: nibName, ofType: "nib")
-                print("Checking for \(nibName).nib: \(nibPath != nil ? "FOUND" : "NOT FOUND")")
-            }
-        }
 
         // Register cells
         if isRecent {
@@ -256,148 +188,7 @@ final class MemoryViewController: UIViewController {
             }
         }
     }
-    
-    // MARK: - Scheduled Memories Section Setup
-    private func setupScheduledMemoriesSection() {
-        guard scheduledContainerView != nil else {
-            print("⚠️ scheduledContainerView is not connected in XIB")
-            return
-        }
-        
-        scheduledLabel.text = "Memory Capsules"
-        scheduledLabel.font = UIFont.systemFont(ofSize: 22, weight: .bold)
-        scheduledLabel.textColor = .label
-        
-        // Check if scheduledCollectionView exists
-        guard let scheduledCollectionView = scheduledCollectionView else {
-            print("⚠️ scheduledCollectionView is nil - creating programmatically")
-            createScheduledCollectionViewProgrammatically()
-            return
-        }
-        
-        print("✅ Using existing scheduledCollectionView from XIB")
-        
-        // Make sure collection view is properly configured
-        scheduledCollectionView.dataSource = self
-        scheduledCollectionView.delegate = self
-        scheduledCollectionView.backgroundColor = .clear
-        scheduledCollectionView.showsHorizontalScrollIndicator = false
-        scheduledCollectionView.isHidden = false
-        
-        
-        scheduledCollectionView.register(
-            MemoryCapsuleCell.self,
-            forCellWithReuseIdentifier: capsuleCellReuseId
-        )
-        
-        // Configure layout if needed
-        if let layout = scheduledCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
-            layout.scrollDirection = .horizontal
-            layout.minimumLineSpacing = 16
-            layout.sectionInset = UIEdgeInsets(top: 0, left: 18, bottom: 0, right: 18)
-            layout.itemSize = CGSize(width: 160, height: 220)
-        } else {
-            // Create new layout
-            let layout = UICollectionViewFlowLayout()
-            layout.scrollDirection = .horizontal
-            layout.minimumLineSpacing = 16
-            layout.sectionInset = UIEdgeInsets(top: 0, left: 18, bottom: 0, right: 18)
-            layout.itemSize = CGSize(width: 160, height: 220)
-            scheduledCollectionView.collectionViewLayout = layout
-        }
-        
-        // Setup no scheduled memories view
-        setupNoScheduledMemoriesView()
-        
-        // Force layout update
-        scheduledContainerView.setNeedsLayout()
-        scheduledContainerView.layoutIfNeeded()
-        
-        // Update visibility
-        updateScheduledMemoriesVisibility()
-    }
 
-    private func createScheduledCollectionViewProgrammatically() {
-        let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .horizontal
-        layout.minimumLineSpacing = 16
-        layout.sectionInset = UIEdgeInsets(top: 0, left: 18, bottom: 0, right: 18)
-        layout.itemSize = CGSize(width: 160, height: 220)
-        
-        let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
-        collectionView.translatesAutoresizingMaskIntoConstraints = false
-        collectionView.backgroundColor = .clear
-        collectionView.showsHorizontalScrollIndicator = false
-        collectionView.dataSource = self
-        collectionView.delegate = self
-        
-        // DEBUG
-        print("Creating scheduledCollectionView programmatically")
-        print("Item size: \(layout.itemSize)")
-        print("Section inset: \(layout.sectionInset)")
-        
-        // Register the cell - CRITICAL STEP!
-        collectionView.register(MemoryCapsuleCell.self, forCellWithReuseIdentifier: MemoryCapsuleCell.reuseId)
-        
-        // Add to scheduledContainerView
-        scheduledContainerView.addSubview(collectionView)
-        
-        // FIXED CONSTRAINTS: Use proper anchor points
-        NSLayoutConstraint.activate([
-            collectionView.topAnchor.constraint(equalTo: scheduledContainerView.topAnchor),
-            collectionView.leadingAnchor.constraint(equalTo: scheduledContainerView.leadingAnchor),
-            collectionView.trailingAnchor.constraint(equalTo: scheduledContainerView.trailingAnchor),
-            collectionView.bottomAnchor.constraint(equalTo: scheduledContainerView.bottomAnchor)
-        ])
-        
-        // Force layout
-        scheduledContainerView.setNeedsLayout()
-        scheduledContainerView.layoutIfNeeded()
-        
-        // DEBUG: Check frame
-        print("Collection view frame after layout: \(collectionView.frame)")
-        print("Container view frame: \(scheduledContainerView.frame)")
-        print("Collection view bounds: \(collectionView.bounds)")
-        print("Collection view contentSize: \(collectionView.contentSize)")
-        
-        // Assign to outlet
-        self.scheduledCollectionView = collectionView
-        print("✅ scheduledCollectionView assigned: \(self.scheduledCollectionView != nil)")
-    }
-
-    private func registerScheduledCollectionViewCells(_ collectionView: UICollectionView) {
-        // Register the MemoryCapsuleCell class (programmatic SwiftUI cell)
-        collectionView.register(MemoryCapsuleCell.self, forCellWithReuseIdentifier: capsuleCellReuseId)
-        print("✅ Programmatically registered MemoryCapsuleCell CLASS with identifier: \(capsuleCellReuseId)")
-    }
-    
-    private func setupNoScheduledMemoriesView() {
-        guard let noScheduledView = noScheduledMemoriesView else {
-            print("⚠️ noScheduledMemoriesView is nil - creating programmatically")
-            // Create programmatically if needed
-            let container = UIView()
-            container.translatesAutoresizingMaskIntoConstraints = false
-            container.backgroundColor = .clear
-            container.isHidden = true
-            
-            if let scheduledContainer = scheduledContainerView {
-                view.insertSubview(container, belowSubview: scheduledContainer)
-                NSLayoutConstraint.activate([
-                    container.topAnchor.constraint(equalTo: scheduledContainer.topAnchor),
-                    container.leadingAnchor.constraint(equalTo: scheduledContainer.leadingAnchor),
-                    container.trailingAnchor.constraint(equalTo: scheduledContainer.trailingAnchor),
-                    container.bottomAnchor.constraint(equalTo: scheduledContainer.bottomAnchor)
-                ])
-                
-                self.noScheduledMemoriesView = container
-                setupNoScheduledViewUI(container)
-            }
-            return
-        }
-        
-        // Setup the UI for the view
-        setupNoScheduledViewUI(noScheduledView)
-    }
     
     private func setupNoScheduledViewUI(_ container: UIView) {
         container.subviews.forEach { $0.removeFromSuperview() }
@@ -464,42 +255,6 @@ final class MemoryViewController: UIViewController {
         ])
     }
 
-    
-    private func updateScheduledMemoriesVisibility() {
-        // Check if we have any scheduled memories
-        let hasScheduledMemories = !scheduledVisibilityMemories.isEmpty || !scheduledMemories.isEmpty
-        
-        print("📊 Scheduled Visibility Check:")
-        print("  - scheduledVisibilityMemories: \(scheduledVisibilityMemories.count)")
-        print("  - scheduledMemories: \(scheduledMemories.count)")
-        print("  - Has scheduled: \(hasScheduledMemories)")
-        
-        // Show/hide the appropriate views
-        scheduledContainerView?.isHidden = !hasScheduledMemories
-        noScheduledMemoriesView?.isHidden = hasScheduledMemories
-        
-        // Safely reload the scheduled collection view
-        if let scheduledCollectionView = scheduledCollectionView {
-            print("✅ scheduledCollectionView exists, reloading data")
-            scheduledCollectionView.reloadData()
-        } else {
-            print("⚠️ scheduledCollectionView is nil in updateScheduledMemoriesVisibility")
-            
-            // Only try to create it once, not repeatedly
-            if !hasAttemptedToCreateCollectionView {
-                hasAttemptedToCreateCollectionView = true
-                print("Attempting to create scheduledCollectionView...")
-                createScheduledCollectionViewProgrammatically()
-                
-                // Try to reload after a short delay
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    if let scv = self.scheduledCollectionView {
-                        scv.reloadData()
-                    }
-                }
-            }
-        }
-    }
 
     // Add this property to track if we've already tried to create the collection view
     private var hasAttemptedToCreateCollectionView = false
@@ -530,16 +285,6 @@ final class MemoryViewController: UIViewController {
                     self.categoriesCollectionView.reloadData()
                     self.privateCollectionView.reloadData()
                     self.sharedCollectionView.reloadData()
-                    
-                    if let scheduledCollectionView = self.scheduledCollectionView {
-                        scheduledCollectionView.reloadData()
-                    } else {
-                        print("⚠️ scheduledCollectionView is nil in reloadFromStore")
-                    }
-                    
-                    // Update scheduled section visibility
-                    self.updateScheduledMemoriesVisibility()
-                    
                     self.recentsLabel.isHidden = self.recentMemories.isEmpty
                 }
             } catch {
@@ -549,8 +294,6 @@ final class MemoryViewController: UIViewController {
                     self.recentsCollectionView.reloadData()
                     self.privateCollectionView.reloadData()
                     self.sharedCollectionView.reloadData()
-                    self.scheduledCollectionView.reloadData()
-                    self.updateScheduledMemoriesVisibility()
                 }
             }
         }
@@ -558,46 +301,6 @@ final class MemoryViewController: UIViewController {
     
     @objc private func memoriesUpdated(_ n: Notification) {
         reloadFromStore()
-        loadScheduledMemories()
-    }
-    
-    // MARK: - Scheduled Memories
-    private func loadScheduledMemories() {
-        Task {
-            do {
-                let memories = try await SupabaseManager.shared.getScheduledMemories()
-                DispatchQueue.main.async {
-                    self.scheduledMemories = memories
-                    self.updateScheduledMemoriesVisibility()
-                    self.checkForReadyMemories()
-                }
-            } catch {
-                print("Error loading scheduled memories: \(error)")
-                DispatchQueue.main.async {
-                    self.updateScheduledMemoriesVisibility()
-                }
-            }
-        }
-    }
-    
-    private func startCountdownTimer() {
-        countdownTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [weak self] _ in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                // Update visible capsule cells
-                self.scheduledCollectionView.visibleCells.forEach { cell in
-                    if let indexPath = self.scheduledCollectionView.indexPath(for: cell),
-                       indexPath.item < self.scheduledVisibilityMemories.count {
-                        let memory = self.scheduledVisibilityMemories[indexPath.item]
-                        // You could update a countdown timer on the cell here
-                    }
-                }
-                
-                // Check for newly ready memories
-                self.checkForReadyMemories()
-            }
-        }
     }
     
     private func checkForReadyMemories() {
@@ -912,30 +615,12 @@ extension MemoryViewController: UICollectionViewDataSource, UICollectionViewDele
         if collectionView == categoriesCollectionView { return categories.count }
         if collectionView == privateCollectionView { return privateMemories.count }
         if collectionView == sharedCollectionView { return sharedMemories.count }
-        if collectionView == scheduledCollectionView { return scheduledVisibilityMemories.count }
+        //if collectionView == scheduledCollectionView { return scheduledVisibilityMemories.count }
         return 0
     }
 
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         
-
-            
-            if collectionView == scheduledCollectionView {
-                let memory = scheduledVisibilityMemories[indexPath.item]
-                
-                // Convert to ScheduledMemory model
-                let scheduledMemory = convertToScheduledMemory(memory)
-                
-                guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: MemoryCapsuleCell.reuseId, for: indexPath) as? MemoryCapsuleCell else {
-                    return UICollectionViewCell()
-                }
-                
-                cell.configure(with: scheduledMemory) { [weak self] in
-                    self?.handleCapsuleTap(memory: memory)
-                }
-                
-                return cell
-            }
         
         // Recents
         if collectionView == recentsCollectionView {
@@ -985,18 +670,6 @@ extension MemoryViewController: UICollectionViewDataSource, UICollectionViewDele
 
         return cell
     }
-    
-    @objc private func handleCapsuleTapGesture(_ gesture: UITapGestureRecognizer) {
-        guard let cell = gesture.view?.superview?.superview as? UICollectionViewCell,
-              let indexPath = scheduledCollectionView.indexPath(for: cell) else {
-            return
-        }
-        
-        let memory = scheduledVisibilityMemories[indexPath.item]
-        handleCapsuleTap(memory: memory)
-    }
-
-    // Keep your existing handleCapsuleTap method
  
     private func handleCapsuleTap(memory: SupabaseMemory) {
         // Check if ready
@@ -1058,7 +731,7 @@ extension MemoryViewController: UICollectionViewDataSource, UICollectionViewDele
         if collectionView == categoriesCollectionView { return CGSize(width: 105, height: 99) }
         
         // THIS IS THE UPDATE YOU WANT:
-        if collectionView == scheduledCollectionView { return CGSize(width: 170, height: 210) }
+        //if collectionView == scheduledCollectionView { return CGSize(width: 170, height: 210) }
         
         return CGSize(width: 105, height: 99)
     }
@@ -1066,38 +739,7 @@ extension MemoryViewController: UICollectionViewDataSource, UICollectionViewDele
     // Selection
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         // Scheduled capsules
-        if collectionView == scheduledCollectionView {
-            let memory = scheduledVisibilityMemories[indexPath.item]
-            print("🎯 Tapped scheduled memory: \(memory.title)")
-            
-            if let releaseDate = memory.releaseAt, releaseDate <= Date() {
-                // Ready to open
-                let alert = UIAlertController(
-                    title: "Open Memory Capsule? 🎁",
-                    message: "\(memory.title) is ready to be opened!",
-                    preferredStyle: .alert
-                )
-                alert.addAction(UIAlertAction(title: "Open Now", style: .default) { _ in
-                    self.navigateToDetail(for: memory)
-                })
-                alert.addAction(UIAlertAction(title: "Later", style: .cancel))
-                present(alert, animated: true)
-            } else {
-                // Not ready yet
-                let formatter = DateFormatter()
-                formatter.dateStyle = .medium
-                formatter.timeStyle = .short
-                
-                let alert = UIAlertController(
-                    title: "Memory Capsule 🔒",
-                    message: "\(memory.title) will unlock on:\n\(formatter.string(from: memory.releaseAt ?? Date()))",
-                    preferredStyle: .alert
-                )
-                alert.addAction(UIAlertAction(title: "OK", style: .default))
-                present(alert, animated: true)
-            }
-            return
-        }
+
         
         // Categories
         if collectionView == categoriesCollectionView {

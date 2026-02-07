@@ -27,6 +27,8 @@ class FamilyMemberViewController: UIViewController {
         setupUI()
         setupCollections()
         
+        setupScheduledMemoriesButton()
+        
         // Load data if we have a group
         if let group = group {
             loadGroupData()
@@ -34,6 +36,48 @@ class FamilyMemberViewController: UIViewController {
             showError(message: "No group information available")
         }
     }
+    
+    
+    private func setupScheduledMemoriesButton() {
+        // Add button below members collection view
+        let scheduledMemoriesButton = UIButton(type: .system)
+        scheduledMemoriesButton.setTitle("View Scheduled Memories", for: .normal)
+        scheduledMemoriesButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+        scheduledMemoriesButton.setTitleColor(.white, for: .normal)
+        scheduledMemoriesButton.backgroundColor = UIColor(hex: "#5AC8FA")
+        scheduledMemoriesButton.layer.cornerRadius = 12
+        scheduledMemoriesButton.translatesAutoresizingMaskIntoConstraints = false
+        scheduledMemoriesButton.addTarget(self, action: #selector(showScheduledMemories), for: .touchUpInside)
+        
+        // Add some space between membersCollectionView and postsCollectionView
+        if let membersCV = membersCollectionView {
+            view.insertSubview(scheduledMemoriesButton, aboveSubview: membersCV)
+            
+            NSLayoutConstraint.activate([
+                scheduledMemoriesButton.topAnchor.constraint(equalTo: membersCV.bottomAnchor, constant: 20),
+                scheduledMemoriesButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+                scheduledMemoriesButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+                scheduledMemoriesButton.heightAnchor.constraint(equalToConstant: 50)
+            ])
+            
+            // Update postsCollectionView constraint
+            if let postsCV = postsCollectionView {
+                postsCV.topAnchor.constraint(equalTo: scheduledMemoriesButton.bottomAnchor, constant: 20).isActive = true
+            }
+        }
+    }
+    
+    @objc private func showScheduledMemories() {
+        guard let group = group, let groupId = UUID(uuidString: group.id) else {
+            showError(message: "Invalid group")
+            return
+        }
+        
+        let scheduledVC = GroupScheduledMemoriesViewController(groupId: groupId, groupName: group.name)
+        scheduledVC.hidesBottomBarWhenPushed = true
+        navigationController?.pushViewController(scheduledVC, animated: true)
+    }
+
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()

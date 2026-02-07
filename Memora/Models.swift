@@ -350,3 +350,38 @@ struct GroupMemoryViewModel: Identifiable {
         self.userAvatar = nil // You can add avatar support later
     }
 }
+
+
+struct ScheduledMemoryGroup: Codable, Identifiable {
+    let id: UUID
+    let memoryId: UUID
+    let groupId: UUID
+    let scheduledAt: Date
+    let isOpened: Bool
+    let openedAt: Date?
+    let memory: SupabaseMemory?  // Optional nested memory
+    let group: UserGroup?       // Optional nested group
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case memoryId = "memory_id"
+        case groupId = "group_id"
+        case scheduledAt = "scheduled_at"
+        case isOpened = "is_opened"
+        case openedAt = "opened_at"
+        case memory
+        case group
+    }
+}
+
+struct ScheduledMemoryWithGroups: Codable, Identifiable {
+    let scheduledMemory: ScheduledMemoryGroup
+    let memoryDetails: SupabaseMemory
+    let media: [SupabaseMemoryMedia]
+    let scheduledForGroups: [UserGroup]
+    
+    var id: UUID { scheduledMemory.id }
+    var isReadyToOpen: Bool {
+        memoryDetails.releaseAt ?? Date() <= Date()
+    }
+}

@@ -146,6 +146,7 @@ class MemoryCapsuleCell: UICollectionViewCell {
     private let iconCircle = UIView()
     private let iconImageView = UIImageView()
     private let titleLabel = UILabel()
+    private let creatorLabel = UILabel()
     private let timerLabel = UILabel()
     private let statusBadge = UIView()
     private let statusLabel = UILabel()
@@ -154,6 +155,7 @@ class MemoryCapsuleCell: UICollectionViewCell {
     private var timer: Timer?
     private var releaseDate: Date?
     private var tapHandler: (() -> Void)?
+    private var memoryId: UUID?
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -206,14 +208,24 @@ class MemoryCapsuleCell: UICollectionViewCell {
         titleLabel.numberOfLines = 2
         containerView.addSubview(titleLabel)
         
-        // 6. Timer/Date Label
+        
+        // 6. Creator Label - NEW
+        creatorLabel.translatesAutoresizingMaskIntoConstraints = false
+        creatorLabel.font = .systemFont(ofSize: 12)
+        creatorLabel.textColor = .secondaryLabel
+        creatorLabel.textAlignment = .center
+        creatorLabel.numberOfLines = 1
+        containerView.addSubview(creatorLabel)
+        
+        
+        // 7. Timer/Date Label
         timerLabel.translatesAutoresizingMaskIntoConstraints = false
         timerLabel.font = .monospacedDigitSystemFont(ofSize: 13, weight: .medium)
         timerLabel.textColor = .secondaryLabel
         timerLabel.textAlignment = .center
         containerView.addSubview(timerLabel)
         
-        // 7. Status Badge
+        // 8. Status Badge
         statusBadge.translatesAutoresizingMaskIntoConstraints = false
         statusBadge.backgroundColor = UIColor.systemGray6
         statusBadge.layer.cornerRadius = 10
@@ -232,7 +244,7 @@ class MemoryCapsuleCell: UICollectionViewCell {
             containerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             containerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
             
-            iconCircle.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 24),
+            iconCircle.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 20),
             iconCircle.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
             iconCircle.widthAnchor.constraint(equalToConstant: 48),
             iconCircle.heightAnchor.constraint(equalToConstant: 48),
@@ -242,9 +254,13 @@ class MemoryCapsuleCell: UICollectionViewCell {
             iconImageView.widthAnchor.constraint(equalToConstant: 24),
             iconImageView.heightAnchor.constraint(equalToConstant: 24),
             
-            titleLabel.topAnchor.constraint(equalTo: iconCircle.bottomAnchor, constant: 16),
+            titleLabel.topAnchor.constraint(equalTo: iconCircle.bottomAnchor, constant: 12),
             titleLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
             titleLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
+            
+            creatorLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            creatorLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
+            creatorLabel.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
             
             timerLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
             timerLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
@@ -281,7 +297,11 @@ class MemoryCapsuleCell: UICollectionViewCell {
     func configure(with memory: ScheduledMemory, tapHandler: (() -> Void)?) {
         self.tapHandler = tapHandler
         self.releaseDate = memory.releaseAt
+        self.memoryId = memory.id
         titleLabel.text = memory.title
+        
+        creatorLabel.text = "Loading creator..."
+        creatorLabel.isHidden = false
         
         stopTimer()
         
@@ -290,6 +310,34 @@ class MemoryCapsuleCell: UICollectionViewCell {
         } else {
             configureLockedState()
             startTimer()
+        }
+        
+        fetchCreatorInfo(memoryId: memory.id)
+    }
+    
+    private func fetchCreatorInfo(memoryId: UUID) {
+        Task {
+            do {
+                let creatorInfo = try await SupabaseManager.shared.getMemoryCreatorInfo(memoryId: memoryId)
+                
+                DispatchQueue.main.async {
+                    // Only update if this is still the same memory
+                    if self.memoryId == memoryId {
+                        self.creatorLabel.text = "By: \(creatorInfo.name)"
+                        
+                        // Adjust font for better visibility
+                        self.creatorLabel.font = .systemFont(ofSize: 11, weight: .medium)
+                        self.creatorLabel.textColor = .tertiaryLabel
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    if self.memoryId == memoryId {
+                        self.creatorLabel.text = "Creator unknown"
+                        self.creatorLabel.textColor = .systemGray
+                    }
+                }
+            }
         }
     }
     
@@ -385,6 +433,8 @@ class MemoryCapsuleCell: UICollectionViewCell {
         stopTimer()
         iconCircle.layer.removeAllAnimations()
         titleLabel.text = nil
+        creatorLabel.text = nil
         timerLabel.text = nil
+        memoryId = nil
     }
 }
