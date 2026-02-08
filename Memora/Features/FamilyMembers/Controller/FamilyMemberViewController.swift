@@ -13,27 +13,57 @@ class FamilyMemberViewController: UIViewController {
     // MARK: - UI Components
     @IBOutlet weak var membersCollectionView: UICollectionView!
     @IBOutlet weak var postsCollectionView: UICollectionView!
-    @IBOutlet weak var profileButton: UIButton!
+    //@IBOutlet weak var profileButton: UIButton!
     @IBOutlet weak var groupNameLabel: UILabel!
     @IBOutlet weak var membersLoadingIndicator: UIActivityIndicatorView!
     @IBOutlet weak var memoriesLoadingIndicator: UIActivityIndicatorView!
     @IBOutlet weak var membersEmptyLabel: UILabel!
     @IBOutlet weak var memoriesEmptyLabel: UILabel!
     
-    // MARK: - View Lifecycle
+    // MARK: - Notification Center
     override func viewDidLoad() {
         super.viewDidLoad()
         
         setupUI()
         setupCollections()
-        
         setupScheduledMemoriesButton()
+        
+        // Add observer for when a request is approved
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleRequestApproved),
+            name: NSNotification.Name("RequestApproved"),
+            object: nil
+        )
         
         // Load data if we have a group
         if let group = group {
             loadGroupData()
         } else {
             showError(message: "No group information available")
+        }
+    }
+
+    deinit {
+        // Remove observer when view controller is deallocated
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func handleRequestApproved() {
+        print("📢 FamilyMemberViewController: Notification received - refreshing members...")
+        
+        // Refresh only the members data
+        Task {
+            await loadMembers()
+        }
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        // Refresh data when view appears
+        if group != nil {
+            loadGroupData()
         }
     }
     
@@ -82,15 +112,6 @@ class FamilyMemberViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         
-        // Profile button circular styling
-        let radius = min(profileButton.bounds.width, profileButton.bounds.height) / 2
-        profileButton.layer.cornerRadius = radius
-        profileButton.clipsToBounds = true
-        profileButton.imageView?.contentMode = .scaleAspectFill
-        profileButton.contentHorizontalAlignment = .fill
-        profileButton.contentVerticalAlignment = .fill
-        profileButton.layer.borderWidth = 1
-        profileButton.layer.borderColor = UIColor.black.withAlphaComponent(0.12).cgColor
     }
     
     // MARK: - Setup
