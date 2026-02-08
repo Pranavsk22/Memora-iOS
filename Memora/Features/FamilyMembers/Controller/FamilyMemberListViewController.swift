@@ -47,6 +47,13 @@ class FamilyMemberListViewController: UIViewController {
     var members: [GroupMember] = []
     
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        // Always refresh data when view appears
+        loadData()
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         
@@ -59,11 +66,6 @@ class FamilyMemberListViewController: UIViewController {
         for section in 0..<tableView.numberOfSections {
             print("Section \(section) has \(tableView.numberOfRows(inSection: section)) rows")
         }
-        
-        // Force a reload to ensure everything is fresh
-        tableView.reloadData()
-        
-        
     }
     
     override func viewDidLoad() {
@@ -139,6 +141,23 @@ class FamilyMemberListViewController: UIViewController {
         let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleMemberLongPress))
         tableView.addGestureRecognizer(longPressGesture)
         
+        loadData()
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleRequestApproved),
+            name: NSNotification.Name("RequestApproved"),
+            object: nil
+        )
+    }
+    
+    deinit {
+        // Remove observer when view controller is deallocated
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func handleRequestApproved() {
+        print("Notification received: Request was approved, refreshing data...")
         loadData()
     }
 
@@ -651,5 +670,3 @@ private extension UIFont {
         return UIFont(descriptor: descriptor, size: pointSize)
     }
 }
-
-
