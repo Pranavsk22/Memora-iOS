@@ -8,7 +8,7 @@
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <objects>
-        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner" customClass="GroupsListViewController" customModule="Memora" customModuleProvider="target">
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner">
             <connections>
                 <outlet property="addGroupButton" destination="eRq-Sy-1Vx" id="tOc-mW-yJ5"/>
                 <outlet property="emptyStateImage" destination="emptyStateImage" id="lQl-bl-4q8"/>
@@ -26,7 +26,7 @@
                 <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="gLj-yN-oeG">
                     <rect key="frame" x="0.0" y="118" width="393" height="666"/>
                     <subviews>
-                        <tableView clipsSubviews="YES" contentMode="scaleToFill" ambiguous="YES" alwaysBounceVertical="YES" style="plain" separatorStyle="none" rowHeight="-1" estimatedRowHeight="-1" sectionHeaderHeight="-1" estimatedSectionHeaderHeight="-1" sectionFooterHeight="-1" estimatedSectionFooterHeight="-1" translatesAutoresizingMaskIntoConstraints="NO" id="kOi-iD-FCd">
+                        <tableView clipsSubviews="YES" contentMode="scaleToFill" alwaysBounceVertical="YES" style="plain" separatorStyle="none" rowHeight="-1" estimatedRowHeight="-1" sectionHeaderHeight="-1" estimatedSectionHeaderHeight="-1" sectionFooterHeight="-1" estimatedSectionFooterHeight="-1" translatesAutoresizingMaskIntoConstraints="NO" id="kOi-iD-FCd">
                             <rect key="frame" x="0.0" y="0.0" width="393" height="666"/>
                             <color key="backgroundColor" systemColor="systemBackgroundColor"/>
                         </tableView>
@@ -46,10 +46,10 @@
                     <color key="backgroundColor" red="0.94901960784313721" green="0.94901960784313721" blue="0.96862745098039216" alpha="1" colorSpace="custom" customColorSpace="displayP3"/>
                     <constraints>
                         <constraint firstAttribute="trailing" secondItem="kOi-iD-FCd" secondAttribute="trailing" id="1D7-9H-XpN"/>
-                        <constraint firstItem="kOi-iD-FCd" firstAttribute="top" secondItem="gLj-yN-oeG" secondAttribute="top" id="FIX-TABLE-TOP"/>
                         <constraint firstAttribute="bottom" secondItem="kOi-iD-FCd" secondAttribute="bottom" id="1up-4m-inf"/>
                         <constraint firstAttribute="bottom" secondItem="eRq-Sy-1Vx" secondAttribute="bottom" constant="25" id="2gC-jA-eQZ"/>
                         <constraint firstAttribute="trailing" secondItem="eRq-Sy-1Vx" secondAttribute="trailing" constant="15" id="CaI-AC-lE5"/>
+                        <constraint firstItem="kOi-iD-FCd" firstAttribute="top" secondItem="gLj-yN-oeG" secondAttribute="top" id="FIX-TABLE-TOP"/>
                         <constraint firstItem="kOi-iD-FCd" firstAttribute="leading" secondItem="gLj-yN-oeG" secondAttribute="leading" id="ae2-vE-vvz"/>
                     </constraints>
                 </view>
@@ -107,7 +107,7 @@ Create or join a group to get started</string>
             <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
         </systemColor>
         <systemColor name="tertiaryLabelColor">
-            <color red="0.23529411759999999" green="0.23529411759999999" blue="0.26274509800000001" alpha="0.29803921570000003" colorSpace="custom" customColorSpace="sRGB"/>
+            <color red="0.23529411764705882" green="0.23529411764705882" blue="0.2627450980392157" alpha="0.29803921568627451" colorSpace="custom" customColorSpace="sRGB"/>
         </systemColor>
     </resources>
 </document>

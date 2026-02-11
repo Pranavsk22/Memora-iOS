@@ -8,7 +8,7 @@
         <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
     </dependencies>
     <objects>
-        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner" customClass="FamilyMemberViewController" customModule="Memora">
+        <placeholder placeholderIdentifier="IBFilesOwner" id="-1" userLabel="File's Owner">
             <connections>
                 <outlet property="groupNameLabel" destination="y3O-Ol-Kxn" id="Hvr-Oq-43S"/>
                 <outlet property="membersCollectionView" destination="hxh-97-eJ9" id="jjJ-Qq-4TA"/>

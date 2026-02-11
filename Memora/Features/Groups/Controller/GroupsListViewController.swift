@@ -2,39 +2,70 @@ import UIKit
 import Supabase
 
 class GroupsListViewController: UIViewController {
-    
-    @IBOutlet weak var tableView: UITableView!
-    @IBOutlet weak var addGroupButton: UIButton!
-    @IBOutlet weak var emptyStateView: UIView!
-    @IBOutlet weak var emptyStateLabel: UILabel!
-    @IBOutlet weak var emptyStateImage: UIImageView!
-    
+
+    // Prevent storyboard/XIB leftover IBOutlet crash
+    override func setValue(_ value: Any?, forUndefinedKey key: String) {
+        print("Ignored undefined key: \(key)")
+    }
+
+    private let tableView = UITableView(frame: .zero, style: .plain)
+    private let addGroupButton = UIButton(type: .system)
+    private let emptyStateView = UIView()
+    private let emptyStateLabel = UILabel()
+    private let emptyStateImage = UIImageView()
+
     private var groups: [UserGroup] = []
     private var refreshControl = UIRefreshControl()
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = .systemGroupedBackground
+
+        view.backgroundColor = UIColor.systemGray6
+
+        // UI setup block for programmatic views
+        view.addSubview(tableView)
+        view.addSubview(addGroupButton)
+        view.addSubview(emptyStateView)
+
+        tableView.translatesAutoresizingMaskIntoConstraints = false
+        addGroupButton.translatesAutoresizingMaskIntoConstraints = false
+        emptyStateView.translatesAutoresizingMaskIntoConstraints = false
+
+        NSLayoutConstraint.activate([
+            tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            addGroupButton.widthAnchor.constraint(equalToConstant: 56),
+            addGroupButton.heightAnchor.constraint(equalToConstant: 56),
+            addGroupButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            addGroupButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+
+            emptyStateView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            emptyStateView.centerYAnchor.constraint(equalTo: view.centerYAnchor)
+        ])
+
         setupTableView()
         setupFloatingButton()
         setupEmptyState()
-        
+
         // Add long press gesture for delete/leave
         let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress))
         tableView.addGestureRecognizer(longPressGesture)
-        
+
         print("\n🚀=== APP STARTED ===🚀")
         print("👤 User ID: \(SupabaseManager.shared.getCurrentUserId() ?? "None")")
-        
+
         // Test connection
         Task {
             let connected = await SupabaseManager.shared.testConnection()
             print("🌐 Supabase connection: \(connected ? "✅ Connected" : "❌ Failed")")
-            
+
             // Load groups
             loadGroups()
         }
-        
+
         NotificationCenter.default.addObserver(self,
                                              selector: #selector(refreshGroups),
                                              name: NSNotification.Name("GroupsListShouldRefresh"),
@@ -434,41 +465,23 @@ class GroupsListViewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        navigationItem.rightBarButtonItem = UIBarButtonItem(
-            image: UIImage(systemName: "person.circle"),
-            style: .plain,
-            target: self,
-            action: #selector(profileTapped)
-        )
-        navigationItem.rightBarButtonItem?.tintColor = .label
+        
         // load groups normally
         loadGroups()
     }
     
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        // Ensure button stays circular after layout changes
-        addGroupButton.layer.cornerRadius = addGroupButton.frame.width / 2
-
-        // Keep floating button in safe area (bottom-right)
-        let inset = view.safeAreaInsets
-        addGroupButton.transform = .identity
-        addGroupButton.frame.origin.x = view.bounds.width - inset.right - addGroupButton.frame.width - 20
-        addGroupButton.frame.origin.y = view.bounds.height - inset.bottom - addGroupButton.frame.height - 20
-    }
     
     private func setupTableView() {
-        let nib = UINib(nibName: "GroupsTableViewCell", bundle: nil)
-        tableView.register(nib, forCellReuseIdentifier: "GroupCell")
-        
+        tableView.register(GroupCell.self, forCellReuseIdentifier: "GroupCell")
+        tableView.rowHeight = 90
+        tableView.separatorStyle = .none
+        tableView.backgroundColor = .systemGray6
+        tableView.showsVerticalScrollIndicator = false
+        tableView.showsHorizontalScrollIndicator = false
+
         tableView.delegate = self
         tableView.dataSource = self
-        tableView.separatorStyle = .none
-        tableView.backgroundColor = .clear
-        tableView.rowHeight = 84
-        tableView.showsVerticalScrollIndicator = false
-        tableView.contentInset = UIEdgeInsets(top: 0, left: 0, bottom: 28, right: 0)
-        tableView.sectionHeaderTopPadding = 0
+
         // Add refresh control
         refreshControl.addTarget(self, action: #selector(refreshGroups), for: .valueChanged)
         refreshControl.tintColor = .systemBlue
@@ -477,26 +490,27 @@ class GroupsListViewController: UIViewController {
     
     private func setupFloatingButton() {
         // Set button to perfect circle
-        addGroupButton.layer.cornerRadius = addGroupButton.frame.width / 2
+        addGroupButton.layer.cornerRadius = 28 // 56/2
         addGroupButton.clipsToBounds = true
         addGroupButton.backgroundColor = .systemBlue
-        addGroupButton.layer.cornerCurve = .continuous
-        
+
         // Configure plus icon
         let config = UIImage.SymbolConfiguration(pointSize: 24, weight: .medium)
         let plusImage = UIImage(systemName: "plus", withConfiguration: config)
         addGroupButton.setImage(plusImage, for: .normal)
         addGroupButton.tintColor = .white
-        
-        // Shadow (subtle iOS style)
+
+        // Shadow
         addGroupButton.layer.shadowColor = UIColor.black.cgColor
-        addGroupButton.layer.shadowOpacity = 0.12
-        addGroupButton.layer.shadowOffset = CGSize(width: 0, height: 10)
-        addGroupButton.layer.shadowRadius = 20
+        addGroupButton.layer.shadowOpacity = 0.3
+        addGroupButton.layer.shadowOffset = CGSize(width: 0, height: 4)
+        addGroupButton.layer.shadowRadius = 8
         addGroupButton.layer.masksToBounds = false
-        
+
         // Ensure button is on top
         addGroupButton.layer.zPosition = 1000
+
+        addGroupButton.addTarget(self, action: #selector(addGroupPressed), for: .touchUpInside)
     }
     
     private func setupEmptyState() {
@@ -506,17 +520,10 @@ class GroupsListViewController: UIViewController {
         emptyStateLabel.text = "No groups yet\nCreate or join a group to get started"
         emptyStateLabel.textAlignment = .center
         emptyStateLabel.numberOfLines = 0
-        emptyStateLabel.font = .systemFont(ofSize: 16, weight: .semibold)
-        emptyStateLabel.textColor = .secondaryLabel
-        emptyStateImage.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 56, weight: .regular)
     }
     
     @objc private func debugButtonPress() {
         print("DEBUG: Button pressed at \(Date())")
-    }
-
-    @objc private func profileTapped() {
-        print("Profile tapped")
     }
     
     @objc private func refreshGroups() {
@@ -565,17 +572,17 @@ class GroupsListViewController: UIViewController {
         }
     }
     
-    @IBAction func addGroupPressed(_ sender: UIButton) {
+    @objc private func addGroupPressed() {
         print("addGroupPressed called - showing action sheet")
-        
+
         // Create and present the action sheet
         let actionSheet = GroupActionSheetViewController()
         actionSheet.delegate = self
-        
+
         // IMPORTANT: Use overFullScreen to cover everything including tab bar
         actionSheet.modalPresentationStyle = .overFullScreen
         actionSheet.modalTransitionStyle = .crossDissolve
-        
+
         // Present from self (since we're in a tab controller)
         self.present(actionSheet, animated: true) {
             print("Action sheet presented successfully")
@@ -615,7 +622,7 @@ extension GroupsListViewController: UITableViewDataSource, UITableViewDelegate {
         let cell = tableView.dequeueReusableCell(
             withIdentifier: "GroupCell",
             for: indexPath
-        ) as! GroupsTableViewCell
+        ) as! GroupCell
         
         let group = groups[indexPath.row]
         
@@ -626,7 +633,6 @@ extension GroupsListViewController: UITableViewDataSource, UITableViewDelegate {
         cell.configure(
             title: group.name,
             subtitle: "Code: \(group.code)",
-//            image: UIImage(named: "group_family"), // Use appropriate image
             isAdmin: isAdmin
         )
         
@@ -640,7 +646,8 @@ extension GroupsListViewController: UITableViewDataSource, UITableViewDelegate {
         print("Selected group: \(group.name), ID: \(group.id)")
         
         // Navigate to FamilyMemberViewController
-        let familyVC = FamilyMemberViewController(nibName: "FamilyMemberViewController", bundle: nil)
+        let familyVC = FamilyMemberViewController()
+        familyVC.hidesBottomBarWhenPushed = true
         familyVC.group = group // Pass the group
         navigationController?.pushViewController(familyVC, animated: true)
     }
@@ -734,6 +741,110 @@ extension GroupsListViewController: JoinGroupDelegate {
         print("Join request sent successfully, showing confirmation...")
         // You might want to show a confirmation alert
         showAlert(title: "Request Sent", message: "Your join request has been sent to the group admin for approval.")
+    }
+}
+
+
+// MARK: - Programmatic Group Cell
+class GroupCell: UITableViewCell {
+    
+    private let containerView = UIView()
+    private let titleLabel = UILabel()
+    private let subtitleLabel = UILabel()
+    private let adminBadge = UILabel()
+    private let iconContainerView = UIView()
+    private let iconImageView = UIImageView()
+    
+    override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
+        super.init(style: style, reuseIdentifier: reuseIdentifier)
+        setupUI()
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    private func setupUI() {
+        backgroundColor = .clear
+        selectionStyle = .none
+        
+        containerView.translatesAutoresizingMaskIntoConstraints = false
+        containerView.backgroundColor = .white
+        containerView.layer.cornerRadius = 16
+        containerView.layer.shadowColor = UIColor.black.cgColor
+        containerView.layer.shadowOpacity = 0.08
+        containerView.layer.shadowOffset = CGSize(width: 0, height: 4)
+        containerView.layer.shadowRadius = 8
+        containerView.layer.masksToBounds = false
+        
+        titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        titleLabel.textColor = .label
+        
+        subtitleLabel.font = .systemFont(ofSize: 13, weight: .regular)
+        subtitleLabel.textColor = .secondaryLabel
+        
+        adminBadge.text = "ADMIN"
+        adminBadge.font = .systemFont(ofSize: 11, weight: .bold)
+        adminBadge.textColor = .systemBlue
+        adminBadge.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+        adminBadge.layer.cornerRadius = 8
+        adminBadge.clipsToBounds = true
+        adminBadge.textAlignment = .center
+        adminBadge.isHidden = true
+        adminBadge.translatesAutoresizingMaskIntoConstraints = false
+
+        iconContainerView.translatesAutoresizingMaskIntoConstraints = false
+        iconContainerView.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+        iconContainerView.layer.cornerRadius = 22
+        iconContainerView.clipsToBounds = true
+        
+        iconImageView.translatesAutoresizingMaskIntoConstraints = false
+        let symbolConfig = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)
+        iconImageView.image = UIImage(systemName: "person.3.fill", withConfiguration: symbolConfig)
+        iconImageView.tintColor = .systemBlue
+        iconImageView.contentMode = .scaleAspectFit
+
+        iconContainerView.addSubview(iconImageView)
+        
+        let stack = UIStackView(arrangedSubviews: [titleLabel, subtitleLabel])
+        stack.axis = .vertical
+        stack.spacing = 4
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        
+        contentView.addSubview(containerView)
+        containerView.addSubview(iconContainerView)
+        containerView.addSubview(stack)
+        containerView.addSubview(adminBadge)
+        
+        NSLayoutConstraint.activate([
+            containerView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
+            containerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            containerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            containerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
+
+            iconContainerView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
+            iconContainerView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            iconContainerView.widthAnchor.constraint(equalToConstant: 44),
+            iconContainerView.heightAnchor.constraint(equalToConstant: 44),
+
+            iconImageView.centerXAnchor.constraint(equalTo: iconContainerView.centerXAnchor),
+            iconImageView.centerYAnchor.constraint(equalTo: iconContainerView.centerYAnchor),
+
+            stack.leadingAnchor.constraint(equalTo: iconContainerView.trailingAnchor, constant: 14),
+            stack.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: adminBadge.leadingAnchor, constant: -8),
+
+            adminBadge.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16),
+            adminBadge.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            adminBadge.widthAnchor.constraint(greaterThanOrEqualToConstant: 60),
+            adminBadge.heightAnchor.constraint(equalToConstant: 24)
+        ])
+    }
+    
+    func configure(title: String, subtitle: String, isAdmin: Bool) {
+        titleLabel.text = title
+        subtitleLabel.text = subtitle
+        adminBadge.isHidden = !isAdmin
     }
 }
 

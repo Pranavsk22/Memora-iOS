@@ -8,6 +8,14 @@
 import UIKit
 
 class FamilyMemberViewController: UIViewController {
+    override func loadView() {
+        // Prevent automatic XIB loading
+        view = UIView()
+    }
+    // Prevent storyboard/XIB leftover IBOutlet crash
+    override func setValue(_ value: Any?, forUndefinedKey key: String) {
+        print("Ignored undefined key: \(key)")
+    }
     
     var group: UserGroup?
     
@@ -18,18 +26,20 @@ class FamilyMemberViewController: UIViewController {
     private var errorMessage: String?
     
     // MARK: - UI Components
-    @IBOutlet weak var membersCollectionView: UICollectionView!
-    @IBOutlet weak var postsCollectionView: UICollectionView!
-    @IBOutlet weak var profileButton: UIButton!
-    @IBOutlet weak var groupNameLabel: UILabel!
-    @IBOutlet weak var membersLoadingIndicator: UIActivityIndicatorView!
-    @IBOutlet weak var memoriesLoadingIndicator: UIActivityIndicatorView!
-    @IBOutlet weak var membersEmptyLabel: UILabel!
-    @IBOutlet weak var memoriesEmptyLabel: UILabel!
+    private let scrollView = UIScrollView()
+    private let contentView = UIView()
+    private var postsHeightConstraint: NSLayoutConstraint?
+    private let membersCollectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewFlowLayout())
+    private let postsCollectionView = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewFlowLayout())
+    private let membersHeaderButton = UIButton(type: .system)
     
     // MARK: - View Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        title = group?.name ?? "Family"
+        navigationController?.navigationBar.prefersLargeTitles = true
+        navigationItem.largeTitleDisplayMode = .always
         
         setupUI()
         setupCollections()
@@ -42,63 +52,99 @@ class FamilyMemberViewController: UIViewController {
         }
     }
     
+    // Dynamic height update for postsCollectionView and profile button styling
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        
-        // Profile button circular styling
-        let radius = min(profileButton.bounds.width, profileButton.bounds.height) / 2
-        profileButton.layer.cornerRadius = radius
-        profileButton.clipsToBounds = true
-        profileButton.imageView?.contentMode = .scaleAspectFill
-        profileButton.contentHorizontalAlignment = .fill
-        profileButton.contentVerticalAlignment = .fill
-        profileButton.layer.borderWidth = 1
-        profileButton.layer.borderColor = UIColor.black.withAlphaComponent(0.12).cgColor
+
+        postsCollectionView.layoutIfNeeded()
+
+        if let layout = postsCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+            let width = contentView.bounds.width - 32
+            if width > 0 {
+                layout.itemSize = CGSize(width: width, height: 300)
+                layout.invalidateLayout()
+            }
+        }
+
+        let height = postsCollectionView.collectionViewLayout.collectionViewContentSize.height
+        postsHeightConstraint?.constant = max(height, 1)
     }
     
     // MARK: - Setup
     private func setupUI() {
-        view.backgroundColor = UIColor(
-            red: 242/255,
-            green: 242/255,
-            blue: 247/255,
-            alpha: 1
-        )
-        
-        // Set group name if available
-        groupNameLabel.text = group?.name ?? "My Family"
-        
-        // Configure loading indicators
-        membersLoadingIndicator.hidesWhenStopped = true
-        memoriesLoadingIndicator.hidesWhenStopped = true
-        
-        // Configure empty state labels
-        membersEmptyLabel.isHidden = true
-        membersEmptyLabel.text = "No members in this group"
-        membersEmptyLabel.textColor = .systemGray
-        
-        memoriesEmptyLabel.isHidden = true
-        memoriesEmptyLabel.text = "No memories shared in this group"
-        memoriesEmptyLabel.textColor = .systemGray
+        view.backgroundColor = .systemGroupedBackground
+
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.showsVerticalScrollIndicator = false
+
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+
+        membersCollectionView.translatesAutoresizingMaskIntoConstraints = false
+        postsCollectionView.translatesAutoresizingMaskIntoConstraints = false
+
+        membersCollectionView.isScrollEnabled = true
+        postsCollectionView.isScrollEnabled = false
+
+        view.addSubview(scrollView)
+        scrollView.addSubview(contentView)
+
+        contentView.addSubview(membersHeaderButton)
+        contentView.addSubview(membersCollectionView)
+        contentView.addSubview(postsCollectionView)
+
+        membersHeaderButton.translatesAutoresizingMaskIntoConstraints = false
+        membersHeaderButton.setTitle("Family Members  >", for: .normal)
+        membersHeaderButton.setTitleColor(.label, for: .normal)
+        membersHeaderButton.titleLabel?.font = .systemFont(ofSize: 22, weight: .bold)
+        membersHeaderButton.contentHorizontalAlignment = .left
+        membersHeaderButton.addTarget(self, action: #selector(FamilyMemberPressed(_:)), for: .touchUpInside)
+
+        NSLayoutConstraint.activate([
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+
+            membersHeaderButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16),
+            membersHeaderButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            membersHeaderButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            membersHeaderButton.heightAnchor.constraint(equalToConstant: 30),
+
+            membersCollectionView.topAnchor.constraint(equalTo: membersHeaderButton.bottomAnchor, constant: 16),
+            membersCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            membersCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            membersCollectionView.heightAnchor.constraint(equalToConstant: 180),
+
+            postsCollectionView.topAnchor.constraint(equalTo: membersCollectionView.bottomAnchor, constant: 24),
+            postsCollectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            postsCollectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            postsCollectionView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -24)
+        ])
+
+        postsHeightConstraint = postsCollectionView.heightAnchor.constraint(equalToConstant: 300)
+        postsHeightConstraint?.isActive = true
     }
     
     private func setupCollections() {
         // Members Collection
-        let memberNib = UINib(
-            nibName: "FamilyMemberCollectionViewCell",
-            bundle: nil
-        )
         membersCollectionView.register(
-            memberNib,
+            FamilyMemberCollectionViewCell.self,
             forCellWithReuseIdentifier: "FamilyMemberCell"
         )
         membersCollectionView.delegate = self
         membersCollectionView.dataSource = self
         membersCollectionView.backgroundColor = .clear
-        
+        membersCollectionView.showsHorizontalScrollIndicator = false
+
         if let layout = membersCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
             layout.scrollDirection = .horizontal
-            layout.itemSize = CGSize(width: 150, height: 190)
+            layout.itemSize = CGSize(width: 120, height: 160)
             layout.minimumLineSpacing = 16
             layout.sectionInset = UIEdgeInsets(
                 top: 0,
@@ -107,33 +153,27 @@ class FamilyMemberViewController: UIViewController {
                 right: 16
             )
         }
-        
+
         // Posts Collection
-        let memoryNib = UINib(
-            nibName: "FamilyMemoriesCollectionViewCell",
-            bundle: nil
-        )
         postsCollectionView.register(
-            memoryNib,
+            FamilyMemoriesCollectionViewCell.self,
             forCellWithReuseIdentifier: "FamilyMemoriesCell"
         )
         postsCollectionView.delegate = self
         postsCollectionView.dataSource = self
         postsCollectionView.backgroundColor = .clear
         postsCollectionView.showsVerticalScrollIndicator = false
-        
+        postsCollectionView.contentInset = UIEdgeInsets(top: 8, left: 0, bottom: 32, right: 0)
+        // postsCollectionView.alwaysBounceVertical = true   // REMOVE
+
         if let layout = postsCollectionView.collectionViewLayout as? UICollectionViewFlowLayout {
             layout.scrollDirection = .vertical
-            layout.minimumLineSpacing = 35
+            layout.minimumLineSpacing = 24
             layout.sectionInset = UIEdgeInsets(
                 top: 0,
                 left: 16,
                 bottom: 16,
                 right: 16
-            )
-            layout.itemSize = CGSize(
-                width: view.bounds.width - 32,
-                height: 394
             )
         }
     }
@@ -146,10 +186,6 @@ class FamilyMemberViewController: UIViewController {
         errorMessage = nil
         
         // Show loading states
-        membersLoadingIndicator.startAnimating()
-        memoriesLoadingIndicator.startAnimating()
-        membersEmptyLabel.isHidden = true
-        memoriesEmptyLabel.isHidden = true
         
         // Load members and memories in parallel
         Task {
@@ -179,15 +215,11 @@ class FamilyMemberViewController: UIViewController {
             DispatchQueue.main.async {
                 self.members = fetchedMembers
                 self.membersCollectionView.reloadData()
-                self.membersLoadingIndicator.stopAnimating()
-                self.membersEmptyLabel.isHidden = !self.members.isEmpty
             }
         } catch {
             print("Error loading members: \(error)")
             DispatchQueue.main.async {
-                self.membersLoadingIndicator.stopAnimating()
-                self.membersEmptyLabel.isHidden = false
-                self.membersEmptyLabel.text = "Error loading members"
+                // Handle error UI if desired
             }
         }
     }
@@ -201,27 +233,25 @@ class FamilyMemberViewController: UIViewController {
             DispatchQueue.main.async {
                 self.memories = fetchedMemories
                 self.postsCollectionView.reloadData()
-                self.memoriesLoadingIndicator.stopAnimating()
-                self.memoriesEmptyLabel.isHidden = !self.memories.isEmpty
+                self.postsCollectionView.layoutIfNeeded()
+                let height = self.postsCollectionView.collectionViewLayout.collectionViewContentSize.height
+                self.postsHeightConstraint?.constant = max(height, 1)
             }
         } catch {
             print("Error loading memories: \(error)")
             DispatchQueue.main.async {
-                self.memoriesLoadingIndicator.stopAnimating()
-                self.memoriesEmptyLabel.isHidden = false
-                self.memoriesEmptyLabel.text = "Error loading memories"
+                // Handle error UI if desired
             }
         }
     }
     
     private func updateUI() {
-        // Update empty states
-        membersEmptyLabel.isHidden = !members.isEmpty
-        memoriesEmptyLabel.isHidden = !memories.isEmpty
-        
         // Reload collection views
         membersCollectionView.reloadData()
         postsCollectionView.reloadData()
+        postsCollectionView.layoutIfNeeded()
+        let height = postsCollectionView.collectionViewLayout.collectionViewContentSize.height
+        postsHeightConstraint?.constant = max(height, 1)
     }
     
     private func showError(message: String) {
@@ -244,7 +274,7 @@ class FamilyMemberViewController: UIViewController {
     }
     
     // MARK: - Navigation actions
-    @IBAction func FamilyMemberPressed(_ sender: UIButton) {
+    @objc func FamilyMemberPressed(_ sender: UIButton) {
         let familyList = FamilyMemberListViewController(
             nibName: "FamilyMemberListViewController",
             bundle: nil
@@ -256,22 +286,10 @@ class FamilyMemberViewController: UIViewController {
         )
     }
     
-    @IBAction func FamilyMemberChevronPressed(_ sender: UIButton) {
+    @objc func FamilyMemberChevronPressed(_ sender: UIButton) {
         FamilyMemberPressed(sender)
     }
     
-    @IBAction func profileButtonPressed(_ sender: UIButton) {
-        let vc = AccountModalViewController()
-        let nav = UINavigationController(rootViewController: vc)
-        nav.modalPresentationStyle = .pageSheet
-        
-        if let sheet = nav.sheetPresentationController {
-            sheet.detents = [.large()]
-            sheet.selectedDetentIdentifier = .large
-        }
-        
-        present(nav, animated: true)
-    }
 }
 
 // MARK: - CollectionView DataSource & Delegate
@@ -331,7 +349,7 @@ extension FamilyMemberViewController: UICollectionViewDataSource, UICollectionVi
         cell.configure(
             prompt: memory.title,
             author: memory.userName ?? "Unknown",
-            image: nil  // Placeholder - you'll need to load actual images
+            imageURL: nil
         )
         
         // Optional: Add content preview
@@ -358,6 +376,24 @@ extension FamilyMemberViewController: UICollectionViewDataSource, UICollectionVi
             
             // 🚨 CRITICAL FIX: Actually navigate to detail view
             showMemoryDetail(memory: memory)
+        }
+    }
+    
+    func collectionView(_ collectionView: UICollectionView,
+                        didHighlightItemAt indexPath: IndexPath) {
+        if let cell = collectionView.cellForItem(at: indexPath) {
+            UIView.animate(withDuration: 0.15) {
+                cell.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
+            }
+        }
+    }
+
+    func collectionView(_ collectionView: UICollectionView,
+                        didUnhighlightItemAt indexPath: IndexPath) {
+        if let cell = collectionView.cellForItem(at: indexPath) {
+            UIView.animate(withDuration: 0.15) {
+                cell.transform = .identity
+            }
         }
     }
 
@@ -401,17 +437,3 @@ extension FamilyMemberViewController: UICollectionViewDataSource, UICollectionVi
     }
 }
 
-// MARK: - UI Updates
-extension FamilyMemberViewController {
-    private func showLoadingState() {
-        membersLoadingIndicator.startAnimating()
-        memoriesLoadingIndicator.startAnimating()
-        membersEmptyLabel.isHidden = true
-        memoriesEmptyLabel.isHidden = true
-    }
-    
-    private func hideLoadingState() {
-        membersLoadingIndicator.stopAnimating()
-        memoriesLoadingIndicator.stopAnimating()
-    }
-}

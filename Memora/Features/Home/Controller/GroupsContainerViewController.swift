@@ -14,7 +14,7 @@ final class GroupsContainerViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        embedGroupsXIB()
+        embedGroupsProgrammatically()
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -49,11 +49,8 @@ final class GroupsContainerViewController: UIViewController {
         present(nav, animated: true)
     }
 
-    private func embedGroupsXIB() {
-        let vc = GroupsListViewController(
-            nibName: "GroupsListViewController",
-            bundle: nil
-        )
+    private func embedGroupsProgrammatically() {
+        let vc = GroupsListViewController()
 
         addChild(vc)
         view.addSubview(vc.view)

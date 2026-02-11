@@ -14,11 +14,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
-        // Configure Firebase
-        //FirebaseApp.configure()
+        
+        // Check session and route accordingly
+        Task {
+            let sessionActive = await SupabaseManager.shared.checkSessionStatus()
+            
+            DispatchQueue.main.async {
+                let window = UIApplication.shared.windows.first
                 
-        // Check if user is already logged in
+                if sessionActive {
+                    // Navigate to TabScreens.storyboard
+                    let storyboard = UIStoryboard(name: "TabScreens", bundle: nil)
+                    let tabVC = storyboard.instantiateInitialViewController()
+                    window?.rootViewController = tabVC
+                }
+            }
+        }
+        
         return true
     }
 

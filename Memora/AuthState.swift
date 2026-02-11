@@ -24,9 +24,12 @@ class AuthState: ObservableObject {
     }
     
     func checkAuthStatus() async {
-        isAuthenticated = SupabaseManager.shared.isUserLoggedIn()
+        // Force Supabase to refresh session into currentUser
+        let sessionActive = await SupabaseManager.shared.checkSessionStatus()
         
-        if isAuthenticated {
+        isAuthenticated = sessionActive
+        
+        if sessionActive {
             await loadUserProfile()
         } else {
             userProfile = nil
@@ -56,7 +59,7 @@ class AuthState: ObservableObject {
             try await SupabaseManager.shared.signIn(email: email, password: password)
             
             // 3. Get the user ID
-            guard let userId = SupabaseManager.shared.getCurrentUserId() else {
+            guard let userId = await SupabaseManager.shared.getCurrentUserId() else {
                 errorMessage = "Failed to get user ID"
                 return false
             }
@@ -65,7 +68,6 @@ class AuthState: ObservableObject {
             try await SupabaseManager.shared.createUserProfile(userId: userId, name: name, email: email)
             
             // 5. Update state
-            isAuthenticated = true
             await checkAuthStatus()
             
             return true
@@ -84,7 +86,6 @@ class AuthState: ObservableObject {
         
         do {
             try await SupabaseManager.shared.signIn(email: email, password: password)
-            isAuthenticated = true
             await checkAuthStatus()
             return true
         } catch {
@@ -98,7 +99,7 @@ class AuthState: ObservableObject {
         do {
             try await SupabaseManager.shared.signOut()
             isAuthenticated = false
-            await checkAuthStatus()
+            userProfile = nil
         } catch {
             errorMessage = error.localizedDescription
             print("Sign out error: \(error)")

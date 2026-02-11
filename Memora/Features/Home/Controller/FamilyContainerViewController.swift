@@ -12,12 +12,13 @@ final class FamilyContainerViewController: UIViewController {
     private var familyVC: FamilyMemberViewController?
 
     override func viewDidLoad() {
+        view.backgroundColor = .systemBackground
         super.viewDidLoad()
-        embedFamilyXIB()
+        embedFamilyProgrammatic()
     }
 
-    private func embedFamilyXIB() {
-        let vc = FamilyMemberViewController(nibName: "FamilyMemberViewController", bundle: nil)
+    private func embedFamilyProgrammatic() {
+        let vc = FamilyMemberViewController()
         addChild(vc)
         view.addSubview(vc.view)
         vc.view.translatesAutoresizingMaskIntoConstraints = false
