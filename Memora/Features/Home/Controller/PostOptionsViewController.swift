@@ -226,6 +226,7 @@ final class PostOptionsViewController: UIViewController {
     public var userAudioFiles: [(url: URL, duration: TimeInterval)] = []
     public var promptFallbackImageURL: String? = nil
     public var promptText: String? = nil // NEW: Added for prompt text
+    public var category: String? = nil
 
     // MARK: UI
     private let dimView = UIControl()
@@ -900,6 +901,7 @@ final class PostOptionsViewController: UIViewController {
                     memory = try await SupabaseManager.shared.createMemory(
                         title: title,
                         year: year,
+                        category: self.category,
                         visibility: visibility,
                         scheduledDate: scheduleDate,
                         images: userImages,
@@ -916,6 +918,7 @@ final class PostOptionsViewController: UIViewController {
                     memory = try await SupabaseManager.shared.createMemory(
                         title: title,
                         year: year,
+                        category: self.category,
                         visibility: visibility,
                         scheduledDate: scheduleDate,
                         images: userImages,

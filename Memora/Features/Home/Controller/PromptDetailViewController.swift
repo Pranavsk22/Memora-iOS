@@ -293,19 +293,19 @@ final class LiveBarsView: UIView {
 
 // MARK: - PromptDetailViewControllerSimple
 final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewControllerDelegate {
-
+    
     // MARK: Models
     enum Attachment {
         case image(id: UUID, image: UIImage)
         case audio(url: URL, duration: TimeInterval)
     }
-
+    
     private enum RecordingState {
         case idle
         case recording
         case paused
     }
-
+    
     // MARK: Dependencies
     private let prompt: Prompt
     init(prompt: Prompt) {
@@ -313,34 +313,34 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         super.init(nibName: nil, bundle: nil)
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) not implemented") }
-
+    
     // MARK: State
     private var attachments: [Attachment] = [] { didSet { refreshAttachmentsViews() } }
-
+    
     private var recordingState: RecordingState = .idle {
         didSet { DispatchQueue.main.async { self.syncToolbarToRecordingState() } }
     }
-
+    
     private var audioFileURL: URL?
     private var audioRecorder: AVAudioRecorder?
     private var audioPlayer: AVAudioPlayer?
     private var audioDurationSeconds: TimeInterval = 0
-
+    
     private var meterTimer: Timer?
     private var durationTimer: Timer?
     private var playbackTimer: Timer?
-
+    
     private var recordingStartDate: Date?
     private var accumulatedRecordingDuration: TimeInterval = 0
-
+    
     private var pendingSendAfterStop: Bool = false
-
+    
     // playback coordination
     private weak var currentPlayingCard: AudioCardView?
-
+    
     // waveform drawer
     private let waveformDrawer = WaveformImageDrawer()
-
+    
     // MARK: Views
     private let scrollView: UIScrollView = {
         let s = UIScrollView()
@@ -348,13 +348,13 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         s.alwaysBounceVertical = true
         return s
     }()
-
+    
     private let contentView: UIView = {
         let v = UIView()
         v.translatesAutoresizingMaskIntoConstraints = false
         return v
     }()
-
+    
     private let avatarImageView: UIImageView = {
         let iv = UIImageView()
         iv.translatesAutoresizingMaskIntoConstraints = false
@@ -363,7 +363,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         iv.layer.cornerRadius = 20
         return iv
     }()
-
+    
     private lazy var textView: UITextView = {
         let tv = UITextView()
         tv.translatesAutoresizingMaskIntoConstraints = false
@@ -375,7 +375,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         tv.backgroundColor = .clear
         return tv
     }()
-
+    
     private let placeholderLabel: UILabel = {
         let l = UILabel()
         l.translatesAutoresizingMaskIntoConstraints = false
@@ -384,7 +384,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         l.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
         return l
     }()
-
+    
     private let attachmentsStack: UIStackView = {
         let s = UIStackView()
         s.axis = .vertical
@@ -392,7 +392,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         s.translatesAutoresizingMaskIntoConstraints = false
         return s
     }()
-
+    
     private let toolbarEffectView: UIVisualEffectView = {
         let v = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialLight))
         v.translatesAutoresizingMaskIntoConstraints = false
@@ -400,7 +400,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         v.layer.masksToBounds = true
         return v
     }()
-
+    
     private let cameraButton: UIButton = {
         let b = UIButton(type: .system)
         b.translatesAutoresizingMaskIntoConstraints = false
@@ -408,7 +408,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         b.tintColor = .label
         return b
     }()
-
+    
     private let galleryButton: UIButton = {
         let b = UIButton(type: .system)
         b.translatesAutoresizingMaskIntoConstraints = false
@@ -416,7 +416,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         b.tintColor = .label
         return b
     }()
-
+    
     private let trashButton: UIButton = {
         let b = UIButton(type: .system)
         b.translatesAutoresizingMaskIntoConstraints = false
@@ -425,7 +425,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         b.isHidden = true
         return b
     }()
-
+    
     private let pauseButton: UIButton = {
         let b = UIButton(type: .system)
         b.translatesAutoresizingMaskIntoConstraints = false
@@ -434,7 +434,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         b.isHidden = true
         return b
     }()
-
+    
     private let sendButton: UIButton = {
         let b = UIButton(type: .system)
         b.translatesAutoresizingMaskIntoConstraints = false
@@ -444,7 +444,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         b.isHidden = true
         return b
     }()
-
+    
     private let micButton: UIButton = {
         let b = UIButton(type: .system)
         b.translatesAutoresizingMaskIntoConstraints = false
@@ -452,14 +452,14 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         b.tintColor = .label
         return b
     }()
-
+    
     private var toolbarBottomConstraint: NSLayoutConstraint!
     private var textViewHeightConstraint: NSLayoutConstraint!
-
+    
     private var liveRecordingContainer: UIView?
     private var liveBarsView: LiveBarsView?
     private var liveDurationLabel: UILabel?
-
+    
     // MARK: Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -468,25 +468,25 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         setupViews()
         wireActions()
         placeholderLabel.text = prompt.text
-
+        
         if let name = Session.shared.currentUser.avatarName, let img = UIImage(named: name) {
             avatarImageView.image = img
         } else {
             avatarImageView.image = UIImage(systemName: "person.circle.fill")
         }
-
+        
         addKeyboardObservers()
         addTapToDismiss()
         recordingState = .idle
     }
-
+    
     deinit {
         removeKeyboardObservers()
         meterTimer?.invalidate()
         durationTimer?.invalidate()
         playbackTimer?.invalidate()
     }
-
+    
     // MARK: Setup
     private func setupNav() {
         navigationItem.leftBarButtonItem = UIBarButtonItem(image: UIImage(systemName: "chevron.left"),
@@ -498,62 +498,62 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
                                                             target: self,
                                                             action: #selector(onPostTap))
     }
-
+    
     private func setupViews() {
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
-
+        
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: view.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-
+            
             contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
             contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor)
         ])
-
+        
         contentView.addSubview(avatarImageView)
         contentView.addSubview(textView)
         contentView.addSubview(placeholderLabel)
         contentView.addSubview(attachmentsStack)
         view.addSubview(toolbarEffectView)
-
+        
         let leftStack = UIStackView(arrangedSubviews: [cameraButton, galleryButton])
         leftStack.axis = .horizontal
         leftStack.spacing = 18
         leftStack.alignment = .center
         leftStack.translatesAutoresizingMaskIntoConstraints = false
-
+        
         toolbarEffectView.contentView.addSubview(leftStack)
         toolbarEffectView.contentView.addSubview(trashButton)
         toolbarEffectView.contentView.addSubview(pauseButton)
         toolbarEffectView.contentView.addSubview(sendButton)
         toolbarEffectView.contentView.addSubview(micButton)
-
+        
         NSLayoutConstraint.activate([
             avatarImageView.topAnchor.constraint(equalTo: contentView.safeAreaLayoutGuide.topAnchor, constant: 16),
             avatarImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             avatarImageView.widthAnchor.constraint(equalToConstant: 40),
             avatarImageView.heightAnchor.constraint(equalToConstant: 40),
-
+            
             textView.topAnchor.constraint(equalTo: avatarImageView.topAnchor),
             textView.leadingAnchor.constraint(equalTo: avatarImageView.trailingAnchor, constant: 12),
             textView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-
+            
             placeholderLabel.topAnchor.constraint(equalTo: textView.topAnchor),
             placeholderLabel.leadingAnchor.constraint(equalTo: textView.leadingAnchor),
             placeholderLabel.trailingAnchor.constraint(equalTo: textView.trailingAnchor),
-
+            
             attachmentsStack.topAnchor.constraint(equalTo: textView.bottomAnchor, constant: 16),
             attachmentsStack.leadingAnchor.constraint(equalTo: textView.leadingAnchor),
             attachmentsStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             attachmentsStack.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor, constant: -180)
         ])
-
+        
         NSLayoutConstraint.activate([
             toolbarEffectView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             toolbarEffectView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
@@ -561,35 +561,35 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         ])
         toolbarBottomConstraint = toolbarEffectView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8)
         toolbarBottomConstraint.isActive = true
-
+        
         NSLayoutConstraint.activate([
             leftStack.leadingAnchor.constraint(equalTo: toolbarEffectView.contentView.leadingAnchor, constant: 18),
             leftStack.centerYAnchor.constraint(equalTo: toolbarEffectView.contentView.centerYAnchor),
-
+            
             trashButton.leadingAnchor.constraint(equalTo: toolbarEffectView.contentView.leadingAnchor, constant: 18),
             trashButton.centerYAnchor.constraint(equalTo: toolbarEffectView.contentView.centerYAnchor),
-
+            
             pauseButton.centerXAnchor.constraint(equalTo: toolbarEffectView.contentView.centerXAnchor),
             pauseButton.centerYAnchor.constraint(equalTo: toolbarEffectView.contentView.centerYAnchor),
-
+            
             sendButton.trailingAnchor.constraint(equalTo: toolbarEffectView.contentView.trailingAnchor, constant: -18),
             sendButton.centerYAnchor.constraint(equalTo: toolbarEffectView.contentView.centerYAnchor),
-
+            
             micButton.trailingAnchor.constraint(equalTo: toolbarEffectView.contentView.trailingAnchor, constant: -18),
             micButton.centerYAnchor.constraint(equalTo: toolbarEffectView.contentView.centerYAnchor)
         ])
-
+        
         [cameraButton, galleryButton, trashButton, pauseButton, micButton].forEach { btn in
             btn.widthAnchor.constraint(equalToConstant: 34).isActive = true
             btn.heightAnchor.constraint(equalToConstant: 34).isActive = true
         }
-
+        
         textViewHeightConstraint = textView.heightAnchor.constraint(equalToConstant: 80)
         textViewHeightConstraint.isActive = true
-
+        
         placeholderLabel.isHidden = !textView.text.isEmpty
     }
-
+    
     private func wireActions() {
         cameraButton.addTarget(self, action: #selector(cameraTapped), for: .touchUpInside)
         galleryButton.addTarget(self, action: #selector(galleryTapped), for: .touchUpInside)
@@ -598,16 +598,16 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         sendButton.addTarget(self, action: #selector(onSendTap), for: .touchUpInside)
         trashButton.addTarget(self, action: #selector(onTrashTap), for: .touchUpInside)
     }
-
+    
     // MARK: Attachments layout
     private func refreshAttachmentsViews() {
         attachmentsStack.arrangedSubviews.forEach { $0.removeFromSuperview() }
-
+        
         let imageAttachments = attachments.compactMap { att -> (UUID, UIImage)? in
             if case let .image(id, image) = att { return (id, image) }
             return nil
         }
-
+        
         if imageAttachments.count == 1 {
             let (id, img) = imageAttachments[0]
             attachmentsStack.addArrangedSubview(attachmentImageView(id: id, image: img, large: true))
@@ -641,24 +641,24 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             attachmentsStack.addArrangedSubview(scroll)
             scroll.heightAnchor.constraint(equalToConstant: 140).isActive = true
         }
-
+        
         for att in attachments {
             if case let .audio(url, duration) = att {
                 let card = AudioCardView(url: url,
                                          duration: duration,
                                          playHandler: { [weak self] card in
-                                            self?.playCard(card)
-                                         },
+                    self?.playCard(card)
+                },
                                          deleteHandler: { [weak self] card in
-                                            self?.deleteCard(card)
-                                         })
+                    self?.deleteCard(card)
+                })
                 attachmentsStack.addArrangedSubview(card)
             }
         }
-
+        
         view.layoutIfNeeded()
     }
-
+    
     // MARK: Builders (image cards unchanged)
     private func attachmentImageView(id: UUID, image: UIImage, large: Bool) -> UIView {
         let container = UIView(); container.translatesAutoresizingMaskIntoConstraints = false
@@ -679,7 +679,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         imgView.heightAnchor.constraint(equalToConstant: large ? 200 : 160).isActive = true
         return container
     }
-
+    
     private func smallImageCard(id: UUID, image: UIImage) -> UIView {
         let v = UIView(); v.translatesAutoresizingMaskIntoConstraints = false
         let iv = UIImageView(image: image); iv.translatesAutoresizingMaskIntoConstraints = false
@@ -694,7 +694,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             iv.trailingAnchor.constraint(equalTo: v.trailingAnchor),
             iv.topAnchor.constraint(equalTo: v.topAnchor),
             iv.bottomAnchor.constraint(equalTo: v.bottomAnchor),
-
+            
             delete.topAnchor.constraint(equalTo: v.topAnchor, constant: 6),
             delete.trailingAnchor.constraint(equalTo: v.trailingAnchor, constant: -6),
             delete.widthAnchor.constraint(equalToConstant: 28),
@@ -702,7 +702,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         ])
         return v
     }
-
+    
     private func removeAttachment(id: UUID) {
         attachments.removeAll { att in
             switch att {
@@ -711,7 +711,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             }
         }
     }
-
+    
     // MARK: Image picking
     @objc private func galleryTapped() {
         var config = PHPickerConfiguration(photoLibrary: .shared())
@@ -721,7 +721,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         picker.delegate = self
         present(picker, animated: true)
     }
-
+    
     @objc private func cameraTapped() {
         guard UIImagePickerController.isSourceTypeAvailable(.camera) else { galleryTapped(); return }
         let picker = UIImagePickerController()
@@ -729,7 +729,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         picker.sourceType = .camera
         present(picker, animated: true)
     }
-
+    
     // MARK: Recording flow
     @objc private func micToggleTapped() {
         switch recordingState {
@@ -741,7 +741,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             resumeRecording()
         }
     }
-
+    
     @objc private func onSendTap() {
         guard recordingState == .recording || recordingState == .paused else { return }
         if recordingState == .recording {
@@ -757,11 +757,11 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             finalizeAndAppendRecordedFile(url: url, duration: duration)
         }
     }
-
+    
     @objc private func onTrashTap() {
         cancelRecordingOrTransientFile()
     }
-
+    
     private func requestRecordPermissionAndStart() {
         if #available(iOS 17.0, *) {
             AVAudioApplication.requestRecordPermission { [weak self] granted in
@@ -779,7 +779,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             }
         }
     }
-
+    
     private func showMicDeniedAlert() {
         let a = UIAlertController(title: "Microphone required",
                                   message: "Please enable microphone access in Settings to record audio.",
@@ -790,7 +790,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         }))
         present(a, animated: true)
     }
-
+    
     private func startRecording() {
         // stop playback if playing
         if let player = audioPlayer, player.isPlaying {
@@ -799,15 +799,15 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             currentPlayingCard?.playButtonSetPlaying(false)
             currentPlayingCard = nil
         }
-
+        
         let session = AVAudioSession.sharedInstance()
         do {
             try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker])
             try session.setActive(true)
-
+            
             let url = tempAudioURL()
             audioFileURL = url
-
+            
             let settings: [String: Any] = [
                 AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
                 AVSampleRateKey: 44_100,
@@ -818,80 +818,80 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             audioRecorder?.isMeteringEnabled = true
             audioRecorder?.delegate = self
             audioRecorder?.record()
-
+            
             recordingStartDate = Date()
             accumulatedRecordingDuration = 0
             audioDurationSeconds = 0
-
+            
             meterTimer?.invalidate()
             meterTimer = Timer.scheduledTimer(withTimeInterval: 0.04, repeats: true) { [weak self] _ in self?.updateMeters() }
             if let mt = meterTimer { RunLoop.main.add(mt, forMode: .common) }
-
+            
             durationTimer?.invalidate()
             durationTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in self?.updateLiveDuration() }
             if let dt = durationTimer { RunLoop.main.add(dt, forMode: .common) }
-
+            
             showLiveRecordingCard()
             recordingState = .recording
-
+            
             print("Recording started -> \(url.lastPathComponent)")
         } catch {
             print("startRecording error:", error)
         }
     }
-
+    
     private func pauseRecording() {
         guard recordingState == .recording, let rec = audioRecorder else { return }
         rec.updateMeters()
         rec.pause()
         if let started = recordingStartDate { accumulatedRecordingDuration += Date().timeIntervalSince(started) }
         recordingStartDate = nil
-
+        
         meterTimer?.invalidate(); meterTimer = nil
         durationTimer?.invalidate(); durationTimer = nil
-
+        
         audioDurationSeconds = accumulatedRecordingDuration
         liveDurationLabel?.text = timeString(for: audioDurationSeconds)
-
+        
         DispatchQueue.main.async {
             UIView.animate(withDuration: 0.12) {
                 self.liveBarsView?.alpha = 0.25
                 self.liveBarsView?.transform = CGAffineTransform(scaleX: 1.0, y: 0.6)
             }
         }
-
+        
         recordingState = .paused
         print("Recording paused (accumulated: \(accumulatedRecordingDuration))")
     }
-
+    
     private func resumeRecording() {
         guard recordingState == .paused, let rec = audioRecorder else { return }
         recordingStartDate = Date()
         rec.record()
-
+        
         meterTimer?.invalidate()
         meterTimer = Timer.scheduledTimer(withTimeInterval: 0.04, repeats: true) { [weak self] _ in self?.updateMeters() }
         if let mt = meterTimer { RunLoop.main.add(mt, forMode: .common) }
-
+        
         durationTimer?.invalidate()
         durationTimer = Timer.scheduledTimer(withTimeInterval: 0.25, repeats: true) { [weak self] _ in self?.updateLiveDuration() }
         if let dt = durationTimer { RunLoop.main.add(dt, forMode: .common) }
-
+        
         DispatchQueue.main.async {
             UIView.animate(withDuration: 0.12) {
                 self.liveBarsView?.alpha = 1.0
                 self.liveBarsView?.transform = CGAffineTransform.identity
             }
         }
-
+        
         recordingState = .recording
         print("Recording resumed")
     }
-
+    
     private func sendRecordedAudio() {
         onSendTap()
     }
-
+    
     private func cancelRecordingOrTransientFile() {
         switch recordingState {
         case .recording:
@@ -919,7 +919,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             break
         }
     }
-
+    
     // MARK: Live meters & duration
     private func updateMeters() {
         guard let rec = audioRecorder else { return }
@@ -930,14 +930,14 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             self.liveBarsView?.push(amplitude: CGFloat(amp))
         }
     }
-
+    
     private func updateLiveDuration() {
         var seconds = accumulatedRecordingDuration
         if let started = recordingStartDate { seconds += Date().timeIntervalSince(started) }
         audioDurationSeconds = seconds
         DispatchQueue.main.async { [weak self] in self?.liveDurationLabel?.text = self?.timeString(for: seconds) }
     }
-
+    
     // MARK: Playback per-card orchestration
     private func playCard(_ card: AudioCardView) {
         // If currently playing a different card, stop it
@@ -947,7 +947,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             current.stopProgressAnimation()
             currentPlayingCard = nil
         }
-
+        
         // Toggle behaviour
         if let player = audioPlayer, player.isPlaying, currentPlayingCard === card {
             // currently playing this card -> pause
@@ -956,7 +956,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             currentPlayingCard = nil
             return
         }
-
+        
         // start playback for requested card
         do {
             audioPlayer = try AVAudioPlayer(contentsOf: card.audioURL)
@@ -964,11 +964,11 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             audioPlayer?.play()
             currentPlayingCard = card
             card.playButtonSetPlaying(true)
-
+            
             let duration = audioPlayer?.duration ?? card.duration
             let startOffset = audioPlayer?.currentTime ?? 0
             card.startProgressAnimation(totalDuration: duration, startOffset: startOffset)
-
+            
             playbackTimer?.invalidate()
             playbackTimer = Timer.scheduledTimer(withTimeInterval: 0.15, repeats: true, block: { [weak self, weak card] _ in
                 guard let self = self, let card = card, let player = self.audioPlayer else { return }
@@ -978,19 +978,19 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
                 card.updateProgress(percent: progress)
             })
             if let pt = playbackTimer { RunLoop.main.add(pt, forMode: .common) }
-
+            
         } catch {
             print("play error:", error)
         }
     }
-
+    
     private func stopPlayback() {
         audioPlayer?.stop()
         audioPlayer = nil
         playbackTimer?.invalidate()
         playbackTimer = nil
     }
-
+    
     private func deleteCard(_ card: AudioCardView) {
         if currentPlayingCard === card {
             stopPlayback()
@@ -1007,7 +1007,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             }
         }
     }
-
+    
     // MARK: Toolbar sync
     private func syncToolbarToRecordingState() {
         switch recordingState {
@@ -1015,91 +1015,91 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             cameraButton.isHidden = false
             galleryButton.isHidden = false
             micButton.isHidden = false
-
+            
             pauseButton.isHidden = true
             trashButton.isHidden = true
             sendButton.isHidden = true
-
+            
             micButton.setImage(UIImage(systemName: "mic.fill"), for: .normal)
-
+            
         case .recording:
             cameraButton.isHidden = true
             galleryButton.isHidden = true
-
+            
             micButton.isHidden = true
             pauseButton.isHidden = false
             trashButton.isHidden = false
             sendButton.isHidden = false
-
+            
             pauseButton.setImage(UIImage(systemName: "pause.circle"), for: .normal)
-
+            
         case .paused:
             cameraButton.isHidden = true
             galleryButton.isHidden = true
-
+            
             micButton.isHidden = true
             pauseButton.isHidden = false
             trashButton.isHidden = false
             sendButton.isHidden = false
-
+            
             pauseButton.setImage(UIImage(systemName: "play.circle"), for: .normal)
         }
     }
-
+    
     // MARK: Live UI
     private func showLiveRecordingCard() {
         removeLiveRecordingUI()
-
+        
         let container = UIView(); container.translatesAutoresizingMaskIntoConstraints = false
         container.layer.cornerRadius = 12
         container.backgroundColor = UIColor { trait in trait.userInterfaceStyle == .dark ? UIColor(white: 0.08, alpha: 1) : UIColor(white: 1, alpha: 1) }
-
+        
         let waveContainer = UIView(); waveContainer.translatesAutoresizingMaskIntoConstraints = false
         waveContainer.layer.cornerRadius = 8
         waveContainer.backgroundColor = UIColor(white: 0.96, alpha: 1)
-
+        
         let bars = LiveBarsView(); bars.translatesAutoresizingMaskIntoConstraints = false
         bars.layer.cornerRadius = 8
         bars.clipsToBounds = true
         waveContainer.addSubview(bars)
-
+        
         NSLayoutConstraint.activate([
             bars.leadingAnchor.constraint(equalTo: waveContainer.leadingAnchor, constant: 8),
             bars.trailingAnchor.constraint(equalTo: waveContainer.trailingAnchor, constant: -8),
             bars.topAnchor.constraint(equalTo: waveContainer.topAnchor, constant: 4),
             bars.bottomAnchor.constraint(equalTo: waveContainer.bottomAnchor, constant: -4)
         ])
-
+        
         let durationLabel = UILabel(); durationLabel.translatesAutoresizingMaskIntoConstraints = false
         durationLabel.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         durationLabel.textColor = .secondaryLabel
         durationLabel.text = timeString(for: 0)
-
+        
         view.addSubview(container)
         container.addSubview(waveContainer)
         container.addSubview(durationLabel)
-
+        
         NSLayoutConstraint.activate([
             container.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
             container.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
             container.bottomAnchor.constraint(equalTo: toolbarEffectView.topAnchor, constant: -12),
-
+            
             waveContainer.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
             waveContainer.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -12),
             waveContainer.topAnchor.constraint(equalTo: container.topAnchor, constant: 12),
             waveContainer.heightAnchor.constraint(equalToConstant: 56),
-
+            
             durationLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 12),
             durationLabel.topAnchor.constraint(equalTo: waveContainer.bottomAnchor, constant: 8),
             durationLabel.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -12)
         ])
-
+        
         liveRecordingContainer = container
         liveBarsView = bars
         liveDurationLabel = durationLabel
         liveBarsView?.transform = CGAffineTransform(scaleX: 1.0, y: 0.8)
     }
-
+    
     private func removeLiveRecordingUI() {
         liveRecordingContainer?.removeFromSuperview()
         liveRecordingContainer = nil
@@ -1107,13 +1107,13 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         liveBarsView = nil
         liveDurationLabel = nil
     }
-
+    
     // MARK: Utilities
     private func tempAudioURL() -> URL {
         let name = "memory_\(UUID().uuidString).m4a"
         return FileManager.default.temporaryDirectory.appendingPathComponent(name)
     }
-
+    
     private func timeString(for seconds: TimeInterval) -> String {
         guard seconds.isFinite else { return "00:00" }
         let s = Int(max(0, round(seconds)))
@@ -1121,21 +1121,23 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         let ss = s % 60
         return String(format: "%02d:%02d", mm, ss)
     }
-
+    
     // MARK: Post / Back
     @objc private func onBack() {
         if let nav = navigationController, nav.viewControllers.count > 1 { nav.popViewController(animated: true) }
         else if presentingViewController != nil { dismiss(animated: true, completion: nil) }
     }
-
+    
     @objc private func onPostTap() {
         let vc = PostOptionsViewController()
         vc.delegate = self
         vc.modalPresentationStyle = .overCurrentContext
-
+        
         // --- populate optional inputs so PostOptions can auto-save locally if no delegate ---
         vc.bodyText = textView.text
         vc.promptText = prompt.text
+        vc.category = prompt.category
+
         // collect images from attachments
         let imgs = attachments.compactMap { att -> UIImage? in
             switch att {
@@ -1144,7 +1146,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             }
         }
         vc.userImages = imgs
-
+        
         // collect audio files from attachments
         let audios = attachments.compactMap { att -> (url: URL, duration: TimeInterval)? in
             switch att {
@@ -1153,7 +1155,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             }
         }
         vc.userAudioFiles = audios
-
+        
         // fallback: if prompt has a remote or local image path, let PostOptions know
         // Try a few common field names on your Prompt model (iconName, imageURL). Adjust as needed.
         if let p = (prompt as? Prompt) {
@@ -1161,10 +1163,10 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             // If you have a different property name for prompt image, change the line below accordingly.
             vc.promptFallbackImageURL = (p.iconName ?? "")
         }
-
+        
         present(vc, animated: true)
     }
-
+    
     // MARK: Keyboard
     private func addKeyboardObservers() {
         NotificationCenter.default.addObserver(self, selector: #selector(keyboardWillShow(_:)),
@@ -1173,7 +1175,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
                                                name: UIResponder.keyboardWillHideNotification, object: nil)
     }
     private func removeKeyboardObservers() { NotificationCenter.default.removeObserver(self) }
-
+    
     @objc private func keyboardWillShow(_ note: Notification) {
         guard let info = note.userInfo,
               let frameValue = info[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue,
@@ -1187,7 +1189,7 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         let options = UIView.AnimationOptions(rawValue: curve << 16)
         UIView.animate(withDuration: duration, delay: 0, options: options) { self.view.layoutIfNeeded() }
     }
-
+    
     @objc private func keyboardWillHide(_ note: Notification) {
         guard let info = note.userInfo,
               let duration = info[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double,
@@ -1196,14 +1198,14 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
         let options = UIView.AnimationOptions(rawValue: curve << 16)
         UIView.animate(withDuration: duration, delay: 0, options: options) { self.view.layoutIfNeeded() }
     }
-
+    
     private func addTapToDismiss() {
         let tap = UITapGestureRecognizer(target: self, action: #selector(dismissKeyboard))
         tap.cancelsTouchesInView = false
         view.addGestureRecognizer(tap)
     }
     @objc private func dismissKeyboard() { view.endEditing(true) }
-
+    
     // MARK: Send finalization helper used from delegate or audioRecorderDidFinishRecording
     private func finalizeAndAppendRecordedFile(url: URL, duration: TimeInterval) {
         let already = attachments.contains { att in
@@ -1214,21 +1216,21 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             showSendConfirmation()
             print("Audio appended to attachments: \(url.lastPathComponent) duration:\(duration)")
         } else { print("Audio already in attachments — skipping append") }
-
+        
         removeLiveRecordingUI()
-
+        
         audioFileURL = nil
         accumulatedRecordingDuration = 0
         audioDurationSeconds = 0
         pendingSendAfterStop = false
-
+        
         playbackTimer?.invalidate(); playbackTimer = nil
-
+        
         recordingState = .idle
-
+        
         refreshAttachmentsViews()
     }
-
+    
     private func showSendConfirmation() {
         let lbl = UILabel()
         lbl.translatesAutoresizingMaskIntoConstraints = false
@@ -1251,169 +1253,102 @@ final class PromptDetailViewControllerSimple: UIViewController, PostOptionsViewC
             UIView.animate(withDuration: 0.25, delay: 0.6, options: [], animations: { lbl.alpha = 0 }) { _ in lbl.removeFromSuperview() }
         }
     }
-
+    
     // MARK: PostOptionsViewControllerDelegate
-    func postOptionsViewControllerDidCancel(_ controller: UIViewController) { controller.dismiss(animated: true) }
+    // MARK: PostOptionsViewControllerDelegate
+    func postOptionsViewControllerDidCancel(_ controller: UIViewController) {
+        controller.dismiss(animated: true)
+    }
 
-    func postOptionsViewController(_ controller: UIViewController, didFinishPostingWithTitle title: String?, scheduleDate: Date?, visibility: MemoryVisibility) {
-        // Build the body and attachments and save to local MemoryStore (preferred)
-        controller.dismiss(animated: true) // dismiss the modal first (non-blocking)
+    func postOptionsViewController(
+        _ controller: UIViewController,
+        didFinishPostingWithTitle title: String?,
+        scheduleDate: Date?,
+        visibility: MemoryVisibility
+    ) {
+        controller.dismiss(animated: true)
+
         let titleText: String
-        if let customTitle = title?.trimmingCharacters(in: .whitespacesAndNewlines), !customTitle.isEmpty {
+        if let customTitle = title?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !customTitle.isEmpty {
             titleText = customTitle
         } else {
-            // Fallback to prompt text as title
             titleText = prompt.text
         }
-        
+
         let bodyText = textView.text.isEmpty ? nil : textView.text
 
-        // Resolve ownerId robustly (String or UUID or fallback)
-        var ownerId: String = "local_user"
-        let uid = Session.shared.currentUser.id
-        if let s = uid as? String {
-            ownerId = s
-        } else if let uuid = uid as? UUID {
-            ownerId = uuid.uuidString
-        } else {
-            ownerId = "\(uid)"
+        let images = attachments.compactMap { att -> UIImage? in
+            if case let .image(_, img) = att { return img }
+            return nil
         }
 
-        // Prepare attachments: save images/audio to store in background
-        DispatchQueue.global(qos: .userInitiated).async {
-            var memAttachments: [MemoryAttachment] = []
+        let audios = attachments.compactMap { att -> (URL, TimeInterval)? in
+            if case let .audio(url, dur) = att { return (url, dur) }
+            return nil
+        }
 
-            // save images
-            let images = self.attachments.compactMap { att -> UIImage? in
-                if case let .image(_, img) = att { return img }
-                return nil
-            }
-            for img in images {
-                do {
-                    let filename = try MemoryStore.shared.saveImageAttachment(img)
-                    let attach = MemoryAttachment(kind: .image, filename: filename)
-                    memAttachments.append(attach)
-                } catch {
-                    print("PromptDetail: failed to save image attachment:", error)
-                }
-            }
+        let categoryValue: String? = prompt.category
 
-            // save audio files
-            let audios = self.attachments.compactMap { att -> (URL, TimeInterval)? in
-                if case let .audio(url, dur) = att { return (url, dur) }
-                return nil
-            }
-            for (url, _) in audios {
-                do {
-                    let filename = try MemoryStore.shared.saveAudioAttachment(at: url)
-                    let attach = MemoryAttachment(kind: .audio, filename: filename)
-                    memAttachments.append(attach)
-                } catch {
-                    print("PromptDetail: failed to save audio attachment:", error)
-                }
-            }
+        Task {
+            do {
+                let memory = try await SupabaseManager.shared.createMemory(
+                    title: titleText,
+                    year: Calendar.current.component(.year, from: Date()),
+                    category: categoryValue,
+                    visibility: visibility,
+                    scheduledDate: scheduleDate,
+                    images: images,
+                    audioFiles: audios,
+                    textContent: bodyText
+                )
 
-            // If user attached no images, attempt fallback from prompt (if available)
-            if images.isEmpty {
-                // If prompt has an image URL or asset name, try to download or load and save it.
-                // We'll attempt using `prompt.iconName` as potential fallback (adjust if your model different)
-                if let iconStr = (self.prompt as? Prompt)?.iconName.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !iconStr.isEmpty {
-                    if let url = URL(string: iconStr), url.scheme?.starts(with: "http") == true {
-                        // try download
-                        do {
-                            let data = try Data(contentsOf: url)
-                            if let img = UIImage(data: data) {
-                                do {
-                                    let fname = try MemoryStore.shared.saveImageAttachment(img)
-                                    let att = MemoryAttachment(kind: .image, filename: fname)
-                                    memAttachments.append(att)
-                                } catch {
-                                    print("PromptDetail: failed to save downloaded fallback image:", error)
-                                }
-                            }
-                        } catch {
-                            print("PromptDetail: couldn't download fallback prompt image:", error)
-                        }
-                    } else {
-                        // treat as asset name
-                        if let img = UIImage(named: iconStr) {
-                            do {
-                                let fname = try MemoryStore.shared.saveImageAttachment(img)
-                                let att = MemoryAttachment(kind: .image, filename: fname)
-                                memAttachments.append(att)
-                            } catch {
-                                print("PromptDetail: failed to save bundled fallback image:", error)
-                            }
-                        }
-                    }
-                }
-            }
+                print("✅ Memory saved to Supabase")
+                print("ID:", memory.id)
+                print("Category:", memory.category ?? "nil")
 
-            // Create Memory and persist via MemoryStore
-            // --- pass category from the prompt so Memory.category is filled ---
-            let categoryValue: String? = (self.prompt as? Prompt)?.category
-
-            MemoryStore.shared.createMemory(ownerId: ownerId,
-                                            title: titleText,
-                                            body: bodyText,
-                                            attachments: memAttachments,
-                                            visibility: visibility,
-                                            scheduledFor: scheduleDate,
-                                            category: categoryValue) { result in
                 DispatchQueue.main.async {
-                    switch result {
-                    case .success(let memory):
-                        // notify the app and return home (pop to root)
-                        NotificationCenter.default.post(name: .memoriesUpdated, object: nil, userInfo: ["memoryId": memory.id])
-
-                        // Print the saved memory (pretty JSON if encodable)
-                        do {
-                            let enc = JSONEncoder()
-                            enc.outputFormatting = [.prettyPrinted, .sortedKeys]
-                            let data = try enc.encode(memory)
-                            if let s = String(data: data, encoding: .utf8) {
-                                print("Memory saved (JSON):\n\(s)")
-                            } else {
-                                print("Memory saved:", memory)
-                            }
-                        } catch {
-                            print("Memory saved (model):", memory)
-                        }
-
-                        // Pop to root (go back to Home)
-                        if let nav = self.navigationController {
-                            nav.popToRootViewController(animated: true)
-                        } else {
-                            // fallback: dismiss to root if presented modally
-                            var top = self.presentingViewController
-                            while let p = top?.presentingViewController { top = p }
-                            top?.dismiss(animated: true, completion: nil)
-                        }
-
-                    case .failure(let error):
-                        // show an alert
-                        let a = UIAlertController(title: "Save failed", message: "Could not save memory: \(error.localizedDescription)", preferredStyle: .alert)
-                        a.addAction(UIAlertAction(title: "OK", style: .default))
-                        self.present(a, animated: true)
-                        print("MemoryStore create failed:", error)
+                    if let nav = self.navigationController {
+                        nav.popToRootViewController(animated: true)
+                    } else {
+                        self.dismiss(animated: true)
                     }
+                }
+
+            } catch {
+                print("❌ Supabase save failed:", error)
+
+                DispatchQueue.main.async {
+                    let alert = UIAlertController(
+                        title: "Save Failed",
+                        message: error.localizedDescription,
+                        preferredStyle: .alert
+                    )
+                    alert.addAction(UIAlertAction(title: "OK", style: .default))
+                    self.present(alert, animated: true)
                 }
             }
         }
     }
-}
 
-// MARK: - Delegates
+} // ✅ THIS closes PromptDetailViewControllerSimple class
+
+
+// MARK: - Delegates (These MUST be OUTSIDE the class)
+
 extension PromptDetailViewControllerSimple: UITextViewDelegate {
     func textViewDidChange(_ textView: UITextView) {
         placeholderLabel.isHidden = !textView.text.isEmpty
-        let width = textView.bounds.width > 0 ? textView.bounds.width : (view.bounds.width - 20 - 40 - 12 - 20)
+        let width = textView.bounds.width > 0
+            ? textView.bounds.width
+            : (view.bounds.width - 20 - 40 - 12 - 20)
         let targetSize = CGSize(width: width, height: .greatestFiniteMagnitude)
         let size = textView.sizeThatFits(targetSize)
         let newH = min(max(size.height, 44), 300)
         textViewHeightConstraint?.constant = newH
-        UIView.animate(withDuration: 0.12) { self.view.layoutIfNeeded() }
+        UIView.animate(withDuration: 0.12) {
+            self.view.layoutIfNeeded()
+        }
     }
 }
 
@@ -1421,14 +1356,14 @@ extension PromptDetailViewControllerSimple: PHPickerViewControllerDelegate {
     func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
         picker.dismiss(animated: true)
         guard !results.isEmpty else { return }
+
         for res in results {
             if res.itemProvider.canLoadObject(ofClass: UIImage.self) {
                 res.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] obj, _ in
                     guard let self = self else { return }
                     if let img = obj as? UIImage {
                         DispatchQueue.main.async {
-                            let id = UUID()
-                            self.attachments.append(.image(id: id, image: img))
+                            self.attachments.append(.image(id: UUID(), image: img))
                         }
                     }
                 }
@@ -1438,42 +1373,53 @@ extension PromptDetailViewControllerSimple: PHPickerViewControllerDelegate {
 }
 
 extension PromptDetailViewControllerSimple: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
-    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) { picker.dismiss(animated: true) }
-    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+        picker.dismiss(animated: true)
+    }
+
+    func imagePickerController(
+        _ picker: UIImagePickerController,
+        didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]
+    ) {
         picker.dismiss(animated: true)
         if let img = info[.originalImage] as? UIImage {
-            let id = UUID()
-            attachments.append(.image(id: id, image: img))
+            attachments.append(.image(id: UUID(), image: img))
         }
     }
 }
 
 extension PromptDetailViewControllerSimple: AVAudioRecorderDelegate, AVAudioPlayerDelegate {
-    func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
-        meterTimer?.invalidate(); meterTimer = nil
-        durationTimer?.invalidate(); durationTimer = nil
 
-        if let url = audioFileURL, let player = try? AVAudioPlayer(contentsOf: url) {
-            audioDurationSeconds = player.duration
-        }
+    func audioRecorderDidFinishRecording(
+        _ recorder: AVAudioRecorder,
+        successfully flag: Bool
+    ) {
+        meterTimer?.invalidate()
+        meterTimer = nil
+        durationTimer?.invalidate()
+        durationTimer = nil
 
         if pendingSendAfterStop, let url = audioFileURL {
             removeLiveRecordingUI()
             var duration = accumulatedRecordingDuration
-            if let player = try? AVAudioPlayer(contentsOf: url) { duration = player.duration }
+            if let player = try? AVAudioPlayer(contentsOf: url) {
+                duration = player.duration
+            }
             finalizeAndAppendRecordedFile(url: url, duration: duration)
         } else {
-            audioRecorder = nil
             recordingState = .paused
             removeLiveRecordingUI()
-            print("Recorder finished by system -> moved to paused")
         }
 
         audioRecorder = nil
     }
 
-    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
-        playbackTimer?.invalidate(); playbackTimer = nil
+    func audioPlayerDidFinishPlaying(
+        _ player: AVAudioPlayer,
+        successfully flag: Bool
+    ) {
+        playbackTimer?.invalidate()
+        playbackTimer = nil
         currentPlayingCard?.playButtonSetPlaying(false)
         currentPlayingCard?.stopProgressAnimation()
         currentPlayingCard = nil
