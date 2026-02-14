@@ -79,14 +79,7 @@ class LoginViewController: UIViewController {
         // Set the button as right view of password text field
         passwordTextField.rightView = buttonContainer
         passwordTextField.rightViewMode = .always
-        
-        // Adjust text field padding to prevent text from overlapping the button
-        passwordTextField.layer.sublayerTransform = CATransform3DMakeTranslation(10, 0, -40)
-        
-        // Optional: Add padding on the right side when button is present
-        let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 10, height: passwordTextField.frame.height))
-        passwordTextField.leftView = paddingView
-        passwordTextField.leftViewMode = .always
+        passwordTextField.layer.sublayerTransform = CATransform3DMakeTranslation(10, 0, 0)
     }
     
     @objc private func togglePasswordVisibility() {
