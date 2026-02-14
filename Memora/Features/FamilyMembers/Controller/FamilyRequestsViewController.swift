@@ -191,6 +191,14 @@ extension FamilyRequestsViewController: UITableViewDelegate, UITableViewDataSour
                     loadingAlert.dismiss(animated: true) {
                         self.requests.remove(at: indexPath.row)
                         self.tableView.deleteRows(at: [indexPath], with: .automatic)
+                        
+                        // POST NOTIFICATION HERE
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("RequestApproved"),
+                            object: nil,
+                            userInfo: ["groupId": group.id]
+                        )
+                        
                         self.showAlert(title: "Success", message: "Request approved successfully")
                     }
                 }

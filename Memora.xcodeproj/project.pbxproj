@@ -318,6 +318,7 @@
 				DEVELOPMENT_TEAM = B8C46T352S;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Memora/Info.plist;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We are using microphone for capturing stories";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -346,6 +347,7 @@
 				DEVELOPMENT_TEAM = B8C46T352S;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Memora/Info.plist;
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We are using microphone for capturing stories";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;

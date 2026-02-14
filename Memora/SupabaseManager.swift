@@ -2113,45 +2113,55 @@ extension SupabaseManager {
         print("DEBUG: Attempting to share memory \(memoryId) with group \(groupId)")
         print("DEBUG: Current user ID: \(userId)")
         
-        // DECODE PROPERLY using SupabaseMemory struct instead of [String: AnyJSON]
+        // First, verify the user owns the memory
         let memoryCheck = try await client
             .from("memories")
-            .select("id, user_id, visibility")
+            .select("id, user_id")
             .eq("id", value: memoryId.uuidString)
             .single()
             .execute()
         
-        // Decode using the proper struct
-        struct MemoryCheckResponse: Decodable {
+        struct MemoryOwnerCheck: Decodable {
             let id: UUID
             let userId: UUID
-            let visibility: String
             
             enum CodingKeys: String, CodingKey {
                 case id
                 case userId = "user_id"
-                case visibility
             }
         }
         
-        let memory = try jsonDecoder.decode(MemoryCheckResponse.self, from: memoryCheck.data)
+        let memory = try jsonDecoder.decode(MemoryOwnerCheck.self, from: memoryCheck.data)
         
-        print("DEBUG: Memory owner ID: \(memory.userId)")
-        print("DEBUG: Memory visibility: \(memory.visibility)")
-        
-        // FIXED: Only allow sharing if user OWNS the memory
-        // Remove the "everyone" visibility check - that doesn't grant sharing rights
+        // Check if current user is the owner
         guard memory.userId.uuidString.lowercased() == userId.lowercased() else {
             print("DEBUG: Permission denied - user \(userId) doesn't own memory \(memory.id)")
             throw NSError(domain: "SupabaseManager", code: 403,
                           userInfo: [NSLocalizedDescriptionKey: "You don't have permission to share this memory"])
         }
         
-        print("DEBUG: User owns memory, proceeding with sharing...")
+        print("DEBUG: User owns memory, verifying group membership...")
+        
+        // Check if user is a member of the group
+        let membershipCheck = try await client
+            .from("group_members")
+            .select("user_id")
+            .eq("group_id", value: groupId.uuidString)
+            .eq("user_id", value: userId)
+            .execute()
+        
+        if let jsonArray = try? JSONSerialization.jsonObject(with: membershipCheck.data) as? [[String: Any]],
+           jsonArray.isEmpty {
+            print("DEBUG: User is not a member of group \(groupId)")
+            throw NSError(domain: "SupabaseManager", code: 403,
+                          userInfo: [NSLocalizedDescriptionKey: "You must be a member of the group to share memories"])
+        }
+        
+        print("DEBUG: User is group member, checking if already shared...")
         
         // Check if already shared with group
         let existingCheck = try await client
-            .from("memory_group_access")
+            .from("group_memories")
             .select("id")
             .eq("memory_id", value: memoryId.uuidString)
             .eq("group_id", value: groupId.uuidString)
@@ -2164,6 +2174,7 @@ extension SupabaseManager {
         }
         
         // Create group memory link
+        print("DEBUG: Creating entry in group_memories...")
         try await client
             .from("group_memories")
             .insert([
@@ -2175,7 +2186,8 @@ extension SupabaseManager {
         
         print("DEBUG: Created entry in group_memories")
         
-        // Also create memory_group_access for all group members
+        // Now create memory_group_access entry
+        print("DEBUG: Creating memory_group_access entry...")
         try await client
             .from("memory_group_access")
             .insert([
@@ -2184,7 +2196,7 @@ extension SupabaseManager {
             ])
             .execute()
         
-        print("Memory shared with group successfully")
+        print("DEBUG: Memory shared with group successfully")
     }
     
     /// Create a memory specifically for a group (group-only memory)
@@ -2554,4 +2566,468 @@ extension SupabaseManager {
         
         print("DEBUG: Memory \(memoryId) deleted successfully")
     }
+    
+    
+    // Add this method to UNshare from a specific group (not delete memory)
+    func unshareMemoryFromGroup(memoryId: UUID, groupId: UUID) async throws {
+        print("DEBUG: Unsharing memory \(memoryId) from group \(groupId)")
+        
+        // Remove from group_memories
+        try await client
+            .from("group_memories")
+            .delete()
+            .eq("memory_id", value: memoryId.uuidString)
+            .eq("group_id", value: groupId.uuidString)
+            .execute()
+        
+        // Remove from memory_group_access
+        try await client
+            .from("memory_group_access")
+            .delete()
+            .eq("memory_id", value: memoryId.uuidString)
+            .eq("group_id", value: groupId.uuidString)
+            .execute()
+        
+        print("DEBUG: Memory unshared from group")
+    }
+
+    // Add this method to share with multiple groups
+    func shareMemoryWithGroups(memoryId: UUID, groupIds: [UUID]) async throws {
+        for groupId in groupIds {
+            try await shareMemoryWithGroup(memoryId: memoryId, groupId: groupId)
+        }
+    }
+
+    // Add this method to get groups this memory is already shared with
+    func getGroupsForMemory(memoryId: UUID) async throws -> [UserGroup] {
+        let response = try await client
+            .from("group_memories")
+            .select("""
+                groups!inner (
+                    id,
+                    name,
+                    code,
+                    created_by,
+                    admin_id,
+                    created_at
+                )
+            """)
+            .eq("memory_id", value: memoryId.uuidString)
+            .execute()
+        
+        struct GroupMemoryResponse: Decodable {
+            let groups: UserGroup
+        }
+        
+        let responses = try jsonDecoder.decode([GroupMemoryResponse].self, from: response.data)
+        return responses.map { $0.groups }
+    }
 }
+
+
+extension SupabaseManager {
+    
+    /// Schedule a memory for groups
+    // In SupabaseManager extension - Update the existing scheduleMemoryForGroups method
+    func scheduleMemoryForGroups(
+        title: String,
+        year: Int? = nil,
+        category: String? = nil,
+        releaseDate: Date,
+        groupIds: [UUID],
+        images: [UIImage] = [],
+        audioFiles: [(url: URL, duration: TimeInterval)] = [],
+        textContent: String? = nil
+    ) async throws -> ScheduledMemory {
+        
+        guard let userId = getCurrentUserId() else {
+            throw NSError(domain: "SupabaseManager", code: 401,
+                          userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+        }
+        
+        // First, create the scheduled memory
+        let scheduledMemory = try await scheduleMemory(
+            title: title,
+            year: year,
+            category: category,
+            releaseDate: releaseDate,
+            images: images,
+            audioFiles: audioFiles,
+            textContent: textContent
+        )
+        
+        print("DEBUG: Memory scheduled, now linking to \(groupIds.count) groups")
+        
+        // Create entries in scheduled_memory_groups table for each group
+        for groupId in groupIds {
+            do {
+                let data: [String: AnyJSON] = [
+                    "memory_id": .string(scheduledMemory.id.uuidString),
+                    "group_id": .string(groupId.uuidString),
+                    "is_opened": .bool(false),
+                    "scheduled_at": .string(Date().ISO8601Format())
+                ]
+                
+                try await client
+                    .from("scheduled_memory_groups")
+                    .insert(data)
+                    .execute()
+                
+                print("DEBUG: Linked memory \(scheduledMemory.id) to group \(groupId)")
+                
+                // Also share with the group (for visibility in group_memories table)
+                try await shareMemoryWithGroup(memoryId: scheduledMemory.id, groupId: groupId)
+                
+            } catch {
+                print("DEBUG: Error linking to group \(groupId): \(error)")
+                // Continue with other groups even if one fails
+            }
+        }
+        
+        print("DEBUG: Successfully scheduled memory for \(groupIds.count) groups")
+        return scheduledMemory
+    }
+    
+    /// Create scheduled memory group entry
+    private func createScheduledMemoryGroup(memoryId: UUID, groupId: UUID) async throws {
+        let data: [String: AnyJSON] = [
+            "memory_id": .string(memoryId.uuidString),
+            "group_id": .string(groupId.uuidString),
+            "is_opened": .bool(false)
+        ]
+        
+        try await client
+            .from("scheduled_memory_groups")
+            .insert(data)
+            .execute()
+    }
+    
+    /// Get group-scheduled memories for a specific group
+    // Fix this method - it has incorrect column names
+    func getGroupScheduledMemories(groupId: UUID) async throws -> [ScheduledMemoryWithGroups] {
+        let response = try await client
+            .from("scheduled_memory_groups")
+            .select("""
+                *,
+                memories!inner (
+                    *,
+                    memory_media (*),
+                    profiles!inner (name)
+                ),
+                groups!inner (*)
+            """)
+            .eq("group_id", value: groupId.uuidString)
+            .eq("is_opened", value: false)
+            .order("scheduled_at", ascending: true) // This is the correct column name
+            .execute()
+        
+        print("DEBUG: Group scheduled memories response: \(String(data: response.data, encoding: .utf8) ?? "")")
+        
+        // First, parse manually to debug
+        guard let jsonArray = try? JSONSerialization.jsonObject(with: response.data) as? [[String: Any]] else {
+            print("DEBUG: Could not parse scheduled_memory_groups response")
+            return []
+        }
+        
+        print("DEBUG: Found \(jsonArray.count) scheduled group entries")
+        
+        var scheduledMemories: [ScheduledMemoryWithGroups] = []
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        
+        for item in jsonArray {
+            // Parse scheduled_memory_groups entry
+            guard let id = item["id"] as? String,
+                  let idUUID = UUID(uuidString: id),
+                  let memoryId = item["memory_id"] as? String,
+                  let memoryUUID = UUID(uuidString: memoryId),
+                  let groupId = item["group_id"] as? String,
+                  let groupUUID = UUID(uuidString: groupId),
+                  let scheduledAtString = item["scheduled_at"] as? String,
+                  let scheduledAt = dateFormatter.date(from: scheduledAtString),
+                  let isOpened = item["is_opened"] as? Bool,
+                  let memoriesDict = item["memories"] as? [String: Any],
+                  let groupsDict = item["groups"] as? [String: Any] else {
+                print("DEBUG: Skipping invalid scheduled memory group entry")
+                continue
+            }
+            
+            // Parse memory data
+            guard let memoryTitle = memoriesDict["title"] as? String,
+                  let memoryUserId = memoriesDict["user_id"] as? String,
+                  let memoryUserUUID = UUID(uuidString: memoryUserId),
+                  let memoryCreatedAtString = memoriesDict["created_at"] as? String,
+                  let memoryCreatedAt = dateFormatter.date(from: memoryCreatedAtString),
+                  let releaseAtString = memoriesDict["release_at"] as? String,
+                  let releaseAt = dateFormatter.date(from: releaseAtString) else {
+                print("DEBUG: Skipping memory - missing required fields")
+                continue
+            }
+            
+            let memoryYear = memoriesDict["year"] as? Int
+            let memoryCategory = memoriesDict["category"] as? String
+            
+            // Parse memory media
+            var media: [SupabaseMemoryMedia] = []
+            if let mediaArray = memoriesDict["memory_media"] as? [[String: Any]] {
+                for mediaItem in mediaArray {
+                    guard let mediaId = mediaItem["id"] as? String,
+                          let mediaUUID = UUID(uuidString: mediaId),
+                          let mediaUrl = mediaItem["media_url"] as? String,
+                          let mediaType = mediaItem["media_type"] as? String else {
+                        continue
+                    }
+                    
+                    let textContent = mediaItem["text_content"] as? String
+                    let sortOrder = mediaItem["sort_order"] as? Int ?? 0
+                    let mediaCreatedAtString = mediaItem["created_at"] as? String ?? ""
+                    let mediaCreatedAt = dateFormatter.date(from: mediaCreatedAtString) ?? Date()
+                    
+                    let memoryMedia = SupabaseMemoryMedia(
+                        id: mediaUUID,
+                        memoryId: memoryUUID,
+                        mediaUrl: mediaUrl,
+                        mediaType: mediaType,
+                        textContent: textContent,
+                        sortOrder: sortOrder,
+                        createdAt: mediaCreatedAt
+                    )
+                    media.append(memoryMedia)
+                }
+            }
+            
+            // Parse group data
+            guard let groupName = groupsDict["name"] as? String,
+                  let groupCode = groupsDict["code"] as? String,
+                  let groupCreatedBy = groupsDict["created_by"] as? String,
+                  let groupAdminId = groupsDict["admin_id"] as? String,
+                  let groupCreatedAtString = groupsDict["created_at"] as? String,
+                  let groupCreatedAt = dateFormatter.date(from: groupCreatedAtString) else {
+                print("DEBUG: Skipping group - missing required fields")
+                continue
+            }
+            
+            let group = UserGroup(
+                id: groupUUID.uuidString,
+                name: groupName,
+                code: groupCode,
+                createdBy: groupCreatedBy,
+                adminId: groupAdminId,
+                createdAt: groupCreatedAt
+            )
+            
+            // Parse creator info
+            var creatorName = "Unknown User"
+            if let profilesDict = memoriesDict["profiles"] as? [String: Any],
+               let name = profilesDict["name"] as? String {
+                creatorName = name
+            }
+            
+            // Create SupabaseMemory
+            let supabaseMemory = SupabaseMemory(
+                id: memoryUUID,
+                userId: memoryUserUUID,
+                title: memoryTitle,
+                year: memoryYear,
+                category: memoryCategory,
+                visibility: "scheduled",
+                releaseAt: releaseAt,
+                createdAt: memoryCreatedAt,
+                updatedAt: memoryCreatedAt,
+                memoryMedia: media
+            )
+            
+            // Create ScheduledMemoryGroup
+            let scheduledMemoryGroup = ScheduledMemoryGroup(
+                id: idUUID,
+                memoryId: memoryUUID,
+                groupId: groupUUID,
+                scheduledAt: scheduledAt,
+                isOpened: isOpened,
+                openedAt: nil,
+                memory: supabaseMemory,
+                group: group
+            )
+            
+            // Create ScheduledMemory
+            let previewImageUrl = media.first { $0.mediaType == "photo" }?.mediaUrl
+            
+            let scheduledMemory = ScheduledMemory(
+                id: memoryUUID,
+                title: memoryTitle,
+                year: memoryYear,
+                category: memoryCategory,
+                releaseAt: releaseAt,
+                createdAt: memoryCreatedAt,
+                userId: memoryUserUUID,
+                previewImageUrl: previewImageUrl,
+                isReadyToOpen: releaseAt <= Date()
+            )
+            
+            let scheduledMemoryWithGroups = ScheduledMemoryWithGroups(
+                scheduledMemory: scheduledMemoryGroup,
+                memoryDetails: supabaseMemory,
+                media: media,
+                scheduledForGroups: [group]
+            )
+            
+            scheduledMemories.append(scheduledMemoryWithGroups)
+        }
+        
+        print("DEBUG: Successfully parsed \(scheduledMemories.count) scheduled memories")
+        return scheduledMemories
+    }
+    
+    /// Open a group-scheduled memory
+    // Update the openGroupScheduledMemory method
+    func openGroupScheduledMemory(memoryId: UUID, groupId: UUID) async throws {
+        print("DEBUG: Opening scheduled memory \(memoryId) for group \(groupId)")
+        
+        // Get current date as ISO8601 string
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let currentDateString = dateFormatter.string(from: Date())
+        
+        // Update scheduled_memory_groups table
+        try await client
+            .from("scheduled_memory_groups")
+            .update([
+                "is_opened": AnyJSON.bool(true),
+                "opened_at": AnyJSON.string(currentDateString)
+            ])
+            .eq("memory_id", value: memoryId.uuidString)
+            .eq("group_id", value: groupId.uuidString)
+            .execute()
+        
+        print("DEBUG: Marked as opened in scheduled_memory_groups")
+        
+        // Update memory visibility from scheduled to private
+        try await client
+            .from("memories")
+            .update([
+                "visibility": AnyJSON.string("private")
+            ])
+            .eq("id", value: memoryId.uuidString)
+            .execute()
+        
+        print("DEBUG: Updated memory visibility to private")
+        
+        // Ensure it's shared with the group (if not already)
+        try await shareMemoryWithGroup(memoryId: memoryId, groupId: groupId)
+        
+        print("DEBUG: Memory shared with group for immediate viewing")
+    }
+    
+    /// Get all scheduled memories visible to current user across all groups
+    func getAllScheduledMemoriesForUser() async throws -> [ScheduledMemoryWithGroups] {
+        guard let userId = getCurrentUserId() else {
+            return []
+        }
+        
+        // Get all groups user belongs to
+        let userGroups = try await getMyGroups()
+        var allScheduled: [ScheduledMemoryWithGroups] = []
+        
+        for group in userGroups {
+            if let groupId = UUID(uuidString: group.id) {
+                let groupScheduled = try await getGroupScheduledMemories(groupId: groupId)
+                allScheduled.append(contentsOf: groupScheduled)
+            }
+        }
+        
+        return allScheduled.sorted { $0.memoryDetails.releaseAt ?? Date() < $1.memoryDetails.releaseAt ?? Date() }
+    }
+    
+    // Add this simpler method to SupabaseManager
+    func getScheduledMemoriesForGroup(groupId: UUID) async throws -> [ScheduledMemory] {
+        print("DEBUG: Fetching scheduled memories for group \(groupId)")
+        
+        // First, get memory IDs from scheduled_memory_groups table
+        let scheduledResponse = try await client
+            .from("scheduled_memory_groups")
+            .select("memory_id")
+            .eq("group_id", value: groupId.uuidString)
+            .eq("is_opened", value: false)
+            .order("scheduled_at", ascending: true)
+            .execute()
+        
+        // Parse memory IDs
+        guard let jsonArray = try? JSONSerialization.jsonObject(with: scheduledResponse.data) as? [[String: Any]] else {
+            print("DEBUG: Could not parse scheduled_memory_groups response")
+            return []
+        }
+        
+        let memoryIds = jsonArray.compactMap { $0["memory_id"] as? String }
+        print("DEBUG: Found \(memoryIds.count) scheduled memory IDs")
+        
+        if memoryIds.isEmpty {
+            return []
+        }
+        
+        // Get the actual memories
+        let memoriesResponse = try await client
+            .from("memories")
+            .select("""
+                *,
+                memory_media (
+                    id,
+                    memory_id,
+                    media_url,
+                    media_type,
+                    text_content,
+                    sort_order,
+                    created_at
+                )
+            """)
+            .in("id", values: memoryIds)
+            .order("release_at", ascending: true)
+            .execute()
+        
+        // Parse and convert to ScheduledMemory
+        let supabaseMemories = try jsonDecoder.decode([SupabaseMemory].self, from: memoriesResponse.data)
+        
+        return supabaseMemories.compactMap { supabaseMemory in
+            guard let releaseAt = supabaseMemory.releaseAt else { return nil }
+            
+            let previewImageUrl = supabaseMemory.memoryMedia?.first { $0.mediaType == "photo" }?.mediaUrl
+            
+            return ScheduledMemory(
+                id: supabaseMemory.id,
+                title: supabaseMemory.title,
+                year: supabaseMemory.year,
+                category: supabaseMemory.category,
+                releaseAt: releaseAt,
+                createdAt: supabaseMemory.createdAt,
+                userId: supabaseMemory.userId,
+                previewImageUrl: previewImageUrl,
+                isReadyToOpen: releaseAt <= Date()
+            )
+        }
+    }
+    
+    func getMemoryCreatorInfo(memoryId: UUID) async throws -> (name: String, userId: UUID) {
+        let response = try await client
+            .from("memories")
+            .select("""
+                user_id,
+                profiles!inner(name)
+            """)
+            .eq("id", value: memoryId.uuidString)
+            .single()
+            .execute()
+        
+        // Parse manually
+        guard let json = try? JSONSerialization.jsonObject(with: response.data) as? [String: Any],
+              let userIdString = json["user_id"] as? String,
+              let userId = UUID(uuidString: userIdString),
+              let profiles = json["profiles"] as? [String: Any],
+              let userName = profiles["name"] as? String else {
+            throw NSError(domain: "SupabaseManager", code: -1,
+                          userInfo: [NSLocalizedDescriptionKey: "Could not parse creator info"])
+        }
+        
+        return (name: userName, userId: userId)
+    }
+}
+
+

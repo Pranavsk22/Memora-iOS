@@ -1,6 +1,5 @@
 import UIKit
 
-// Add this protocol at the top of the file
 protocol CreateGroupDelegate: AnyObject {
     func didCreateGroupSuccessfully()
 }

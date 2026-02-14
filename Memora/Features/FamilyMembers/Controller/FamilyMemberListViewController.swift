@@ -9,6 +9,12 @@ import UIKit
 
 class FamilyMemberListViewController: UIViewController {
     
+    private var filteredMembers: [GroupMember] = []
+    private var isSearching = false
+    private let searchController = UISearchController(searchResultsController: nil)
+    
+    @IBOutlet weak var searchBar: UISearchBar!
+    
     private func isCurrentUserAdmin() -> Bool {
         guard let group = group,
               let currentUserId = SupabaseManager.shared.getCurrentUserId() else {
@@ -27,7 +33,8 @@ class FamilyMemberListViewController: UIViewController {
         }
         
         // Check in current members list
-        for member in members {
+        let memberList = isSearching ? filteredMembers : members
+        for member in memberList {
             if member.id.lowercased() == currentUserId.lowercased() {
                 print("isCurrentUserAdmin: Found member \(member.name), isAdmin: \(member.isAdmin)")
                 return member.isAdmin
@@ -47,6 +54,13 @@ class FamilyMemberListViewController: UIViewController {
     var members: [GroupMember] = []
     
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        // Always refresh data when view appears
+        loadData()
+    }
+
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         
@@ -59,11 +73,6 @@ class FamilyMemberListViewController: UIViewController {
         for section in 0..<tableView.numberOfSections {
             print("Section \(section) has \(tableView.numberOfRows(inSection: section)) rows")
         }
-        
-        // Force a reload to ensure everything is fresh
-        tableView.reloadData()
-        
-        
     }
     
     override func viewDidLoad() {
@@ -114,7 +123,7 @@ class FamilyMemberListViewController: UIViewController {
             }
         }
         
-        navigationItem.title = "Family Members"
+        navigationItem.title = "Group Members"
         
         // NO ADD BUTTON - Remove navigation bar button
         navigationItem.rightBarButtonItem = nil
@@ -139,9 +148,44 @@ class FamilyMemberListViewController: UIViewController {
         let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleMemberLongPress))
         tableView.addGestureRecognizer(longPressGesture)
         
+        setupSearchBar()
+        
         loadData()
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleRequestApproved),
+            name: NSNotification.Name("RequestApproved"),
+            object: nil
+        )
+    }
+    
+    private func setupSearchBar() {
+        // Configure search bar
+        searchBar.delegate = self
+        searchBar.placeholder = "Search group members"
+        searchBar.searchBarStyle = .minimal
+        searchBar.backgroundImage = UIImage() // Remove background
+        searchBar.tintColor = .systemBlue
+        
+        // Customize cancel button - it's already in the search bar
+        if let textField = searchBar.value(forKey: "searchField") as? UITextField {
+            textField.backgroundColor = .white
+            textField.layer.cornerRadius = 10
+            textField.clipsToBounds = true
+        }
+    }
+    
+    deinit {
+        // Remove observer when view controller is deallocated
+        NotificationCenter.default.removeObserver(self)
     }
 
+    @objc private func handleRequestApproved() {
+        print("Notification received: Request was approved, refreshing data...")
+        loadData()
+    }
+    
     private func loadData() {
         guard let group = group else {
             print("No group to load data for")
@@ -250,7 +294,7 @@ class FamilyMemberListViewController: UIViewController {
             var memberIndex = indexPath.row
             
             // Adjust index based on sections
-            if isAdmin && joinRequestsExist {
+            if isAdmin && joinRequestsExist && !isSearching {
                 if indexPath.section == 1 {
                     memberIndex = indexPath.row
                 } else if indexPath.section == 0 {
@@ -258,17 +302,23 @@ class FamilyMemberListViewController: UIViewController {
                 }
             }
             
-            guard memberIndex < members.count else { return }
-            let member = members[memberIndex]
+            // Use filtered members when searching
+            let memberList = isSearching ? filteredMembers : members
+            
+            guard memberIndex < memberList.count else { return }
+            let member = memberList[memberIndex]
+            
+            // Find the actual member in the original array
+            guard let actualMember = members.first(where: { $0.id == member.id }) else { return }
             
             // Only show options if current user is admin AND not trying to modify themselves
             guard isAdmin,
                   let currentUserId = SupabaseManager.shared.getCurrentUserId(),
-                  member.id.lowercased() != currentUserId.lowercased() else {
+                  actualMember.id.lowercased() != currentUserId.lowercased() else {
                 return
             }
             
-            showMemberActions(for: member)
+            showMemberActions(for: actualMember)
         }
     }
 
@@ -388,14 +438,6 @@ class FamilyMemberListViewController: UIViewController {
                     isAdmin: makeAdmin
                 )
                 
-                // Also update the local group object if making admin
-                if makeAdmin {
-                    var updatedGroup = group
-                    // Create a new group with updated adminId
-                    // Note: This is a workaround since UserGroup might be a struct
-                    // You might need to use a class or different approach
-                }
-                
                 DispatchQueue.main.async {
                     loadingAlert.dismiss(animated: true) {
                         // Refresh the members list
@@ -418,15 +460,16 @@ class FamilyMemberListViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)
     }
-    
-    
-    
 }
-
 
 extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDelegate {
     
     func numberOfSections(in tableView: UITableView) -> Int {
+        // When searching, hide join requests section
+        if isSearching {
+            return 1
+        }
+        
         // If user is admin AND there are join requests, show 2 sections
         // Otherwise show 1 section for members only
         let isAdmin = isCurrentUserAdmin()
@@ -437,23 +480,27 @@ extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDele
         let isAdmin = isCurrentUserAdmin()
         
         if section == 0 {
-            if isAdmin && !joinRequests.isEmpty {
+            if isAdmin && !joinRequests.isEmpty && !isSearching {
                 return 1 // Join Requests cell
             } else {
-                return members.count // Members in section 0 when not admin
+                // Show either filtered or all members
+                let memberList = isSearching ? filteredMembers : members
+                return memberList.count
             }
         }
         
-        // Section 1 (only shown for admins with requests)
+        // Section 1 (only shown for admins with requests when not searching)
+        if isSearching {
+            return 0
+        }
         return members.count
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        
         let isAdmin = isCurrentUserAdmin()
         
-        // Join Requests section (only for admins with requests)
-        if indexPath.section == 0 && isAdmin && !joinRequests.isEmpty {
+        // Join Requests section (only for admins with requests when not searching)
+        if indexPath.section == 0 && isAdmin && !joinRequests.isEmpty && !isSearching {
             let cell = tableView.dequeueReusableCell(
                 withIdentifier: "FamilyMemberRequestsCell",
                 for: indexPath
@@ -494,17 +541,19 @@ extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDele
             for: indexPath
         ) as! FamilyMemberListTableViewCell
         
-        // Determine which member to show based on section
+        // Get the member list based on search state
+        let memberList = isSearching ? filteredMembers : members
+        
+        // Determine which member to show
         let memberIndex: Int
-        if isAdmin && !joinRequests.isEmpty {
-            // If showing join requests section, members are in section 1
-            memberIndex = indexPath.section == 1 ? indexPath.row : indexPath.row
+        if isAdmin && !joinRequests.isEmpty && !isSearching && indexPath.section == 1 {
+            memberIndex = indexPath.row
         } else {
-            // If not showing join requests, members are in section 0
             memberIndex = indexPath.row
         }
         
-        let member = members[memberIndex]
+        guard memberIndex < memberList.count else { return cell }
+        let member = memberList[memberIndex]
         
         // Check if this member is the current user
         guard let currentUserId = SupabaseManager.shared.getCurrentUserId() else {
@@ -535,7 +584,6 @@ extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDele
         }
         
         // Check if this member is an admin
-        // Use member.isAdmin instead of comparing with group.adminId
         if member.isAdmin {
             let adminLabel = UILabel()
             adminLabel.text = "Admin"
@@ -565,17 +613,19 @@ extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDele
             cell.accessoryView = nil
         }
         
+        // REMOVE THE CHEVRON
+        cell.accessoryType = .none
+        
         cell.backgroundColor = lightGrey
         cell.contentView.backgroundColor = lightGrey
 
         return cell
     }
     
-    // ADD SPACING BETWEEN SECTIONS
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
         let isAdmin = isCurrentUserAdmin()
         
-        if isAdmin && !joinRequests.isEmpty {
+        if isAdmin && !joinRequests.isEmpty && !isSearching {
             // For admins with requests, show header for section 1 (members)
             return section == 1 ? 32 : 0.001
         } else {
@@ -588,7 +638,7 @@ extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDele
         let isAdmin = isCurrentUserAdmin()
         let showHeaderSection: Int
         
-        if isAdmin && !joinRequests.isEmpty {
+        if isAdmin && !joinRequests.isEmpty && !isSearching {
             showHeaderSection = 1 // Members section
         } else {
             showHeaderSection = 0 // Members section
@@ -600,7 +650,14 @@ extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDele
         headerView.backgroundColor = lightGrey
 
         let titleLabel = UILabel()
-        titleLabel.text = "Family Members"
+        
+        // Show count when searching
+        if isSearching {
+            titleLabel.text = "Group Members (\(filteredMembers.count))"
+        } else {
+            titleLabel.text = "Group Members"
+        }
+        
         titleLabel.font = UIFont.preferredFont(forTextStyle: .footnote).bold()
         titleLabel.textColor = .secondaryLabel
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -621,7 +678,7 @@ extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDele
         
         let isAdmin = isCurrentUserAdmin()
         
-        if indexPath.section == 0 && isAdmin && !joinRequests.isEmpty {
+        if indexPath.section == 0 && isAdmin && !joinRequests.isEmpty && !isSearching {
             print("Tapped Join Requests")
             
             DispatchQueue.main.async {
@@ -630,17 +687,60 @@ extension FamilyMemberListViewController: UITableViewDataSource, UITableViewDele
                 self.navigationController?.pushViewController(familyRequest, animated: true)
             }
         } else {
-            // For members section, determine which member was tapped
+            // For members section
+            let memberList = isSearching ? filteredMembers : members
             let memberIndex: Int
-            if isAdmin && !joinRequests.isEmpty && indexPath.section == 1 {
+            
+            if isAdmin && !joinRequests.isEmpty && !isSearching && indexPath.section == 1 {
                 memberIndex = indexPath.row
             } else {
                 memberIndex = indexPath.row
             }
             
-            let member = members[memberIndex]
+            guard memberIndex < memberList.count else { return }
+            let member = memberList[memberIndex]
             print("Tapped \(member.name)")
         }
+    }
+}
+
+// MARK: - UISearchBarDelegate
+extension FamilyMemberListViewController: UISearchBarDelegate {
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if searchText.isEmpty {
+            // Show all members when search text is empty
+            isSearching = false
+            filteredMembers = []
+        } else {
+            // Filter members based on search text
+            isSearching = true
+            filteredMembers = members.filter { member in
+                let nameMatch = member.name.lowercased().contains(searchText.lowercased())
+                let emailMatch = member.email.lowercased().contains(searchText.lowercased())
+                return nameMatch || emailMatch
+            }
+        }
+        
+        // Reload table view
+        tableView.reloadData()
+    }
+    
+    func searchBarCancelButtonClicked(_ searchBar: UISearchBar) {
+        // Clear search and reset
+        searchBar.text = ""
+        searchBar.resignFirstResponder()
+        
+        isSearching = false
+        filteredMembers = []
+        
+        // Reload table view to show all members
+        tableView.reloadData()
+    }
+    
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        // Hide keyboard when search button is clicked
+        searchBar.resignFirstResponder()
     }
 }
 
@@ -651,5 +751,3 @@ private extension UIFont {
         return UIFont(descriptor: descriptor, size: pointSize)
     }
 }
-
-

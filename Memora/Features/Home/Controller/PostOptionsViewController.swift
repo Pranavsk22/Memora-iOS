@@ -842,7 +842,7 @@ final class PostOptionsViewController: UIViewController {
                         scheduledMemory = try await SupabaseManager.shared.scheduleMemoryForGroups(
                             title: title,
                             year: year,
-                            category: self.category,
+                            category: nil,
                             releaseDate: scheduleDate,
                             groupIds: groupIds,
                             images: userImages,
@@ -854,7 +854,7 @@ final class PostOptionsViewController: UIViewController {
                         scheduledMemory = try await SupabaseManager.shared.scheduleMemory(
                             title: title,
                             year: year,
-                            category: self.category,
+                            category: nil,
                             releaseDate: scheduleDate,
                             images: userImages,
                             audioFiles: userAudioFiles,

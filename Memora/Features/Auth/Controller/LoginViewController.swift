@@ -72,21 +72,13 @@ class LoginViewController: UIViewController {
         passwordToggleButton.addTarget(self, action: #selector(togglePasswordVisibility), for: .touchUpInside)
         
         // Create a container view for the button with proper padding
-        let buttonContainer = UIView(frame: CGRect(x: 0, y: 0, width: 40, height: 30))
-        passwordToggleButton.frame = CGRect(x: 0, y: 5, width: 30, height: 20)
+        let buttonContainer = UIView(frame: CGRect(x: 0, y: 0, width: 44, height: 30))
+        passwordToggleButton.frame = CGRect(x: 7, y: 5, width: 24, height: 20)
         buttonContainer.addSubview(passwordToggleButton)
         
         // Set the button as right view of password text field
         passwordTextField.rightView = buttonContainer
         passwordTextField.rightViewMode = .always
-        
-        // Adjust text field padding to prevent text from overlapping the button
-        passwordTextField.layer.sublayerTransform = CATransform3DMakeTranslation(10, 0, -40)
-        
-        // Optional: Add padding on the right side when button is present
-        let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 10, height: passwordTextField.frame.height))
-        passwordTextField.leftView = paddingView
-        passwordTextField.leftViewMode = .always
     }
     
     @objc private func togglePasswordVisibility() {

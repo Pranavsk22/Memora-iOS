@@ -13,19 +13,28 @@ class FamilyMemberViewController: UIViewController {
     // MARK: - UI Components
     @IBOutlet weak var membersCollectionView: UICollectionView!
     @IBOutlet weak var postsCollectionView: UICollectionView!
-    @IBOutlet weak var profileButton: UIButton!
+    //@IBOutlet weak var profileButton: UIButton!
     @IBOutlet weak var groupNameLabel: UILabel!
     @IBOutlet weak var membersLoadingIndicator: UIActivityIndicatorView!
     @IBOutlet weak var memoriesLoadingIndicator: UIActivityIndicatorView!
     @IBOutlet weak var membersEmptyLabel: UILabel!
     @IBOutlet weak var memoriesEmptyLabel: UILabel!
     
-    // MARK: - View Lifecycle
+    // MARK: - Notification Center
     override func viewDidLoad() {
         super.viewDidLoad()
         
         setupUI()
         setupCollections()
+        setupScheduledMemoriesButton()
+        
+        // Add observer for when a request is approved
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleRequestApproved),
+            name: NSNotification.Name("RequestApproved"),
+            object: nil
+        )
         
         // Load data if we have a group
         if let group = group {
@@ -34,19 +43,75 @@ class FamilyMemberViewController: UIViewController {
             showError(message: "No group information available")
         }
     }
+
+    deinit {
+        // Remove observer when view controller is deallocated
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func handleRequestApproved() {
+        print("📢 FamilyMemberViewController: Notification received - refreshing members...")
+        
+        // Refresh only the members data
+        Task {
+            await loadMembers()
+        }
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        
+        // Refresh data when view appears
+        if group != nil {
+            loadGroupData()
+        }
+    }
+    
+    
+    private func setupScheduledMemoriesButton() {
+        // Add button below members collection view
+        let scheduledMemoriesButton = UIButton(type: .system)
+        scheduledMemoriesButton.setTitle("View Scheduled Memories", for: .normal)
+        scheduledMemoriesButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+        scheduledMemoriesButton.setTitleColor(.white, for: .normal)
+        scheduledMemoriesButton.backgroundColor = UIColor(hex: "#5AC8FA")
+        scheduledMemoriesButton.layer.cornerRadius = 12
+        scheduledMemoriesButton.translatesAutoresizingMaskIntoConstraints = false
+        scheduledMemoriesButton.addTarget(self, action: #selector(showScheduledMemories), for: .touchUpInside)
+        
+        // Add some space between membersCollectionView and postsCollectionView
+        if let membersCV = membersCollectionView {
+            view.insertSubview(scheduledMemoriesButton, aboveSubview: membersCV)
+            
+            NSLayoutConstraint.activate([
+                scheduledMemoriesButton.topAnchor.constraint(equalTo: membersCV.bottomAnchor, constant: 20),
+                scheduledMemoriesButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+                scheduledMemoriesButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+                scheduledMemoriesButton.heightAnchor.constraint(equalToConstant: 50)
+            ])
+            
+            // Update postsCollectionView constraint
+            if let postsCV = postsCollectionView {
+                postsCV.topAnchor.constraint(equalTo: scheduledMemoriesButton.bottomAnchor, constant: 20).isActive = true
+            }
+        }
+    }
+    
+    @objc private func showScheduledMemories() {
+        guard let group = group, let groupId = UUID(uuidString: group.id) else {
+            showError(message: "Invalid group")
+            return
+        }
+        
+        let scheduledVC = GroupScheduledMemoriesViewController(groupId: groupId, groupName: group.name)
+        scheduledVC.hidesBottomBarWhenPushed = true
+        navigationController?.pushViewController(scheduledVC, animated: true)
+    }
+
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         
-        // Profile button circular styling
-        let radius = min(profileButton.bounds.width, profileButton.bounds.height) / 2
-        profileButton.layer.cornerRadius = radius
-        profileButton.clipsToBounds = true
-        profileButton.imageView?.contentMode = .scaleAspectFill
-        profileButton.contentHorizontalAlignment = .fill
-        profileButton.contentVerticalAlignment = .fill
-        profileButton.layer.borderWidth = 1
-        profileButton.layer.borderColor = UIColor.black.withAlphaComponent(0.12).cgColor
     }
     
     // MARK: - Setup
@@ -158,9 +223,13 @@ class FamilyMemberViewController: UIViewController {
             preferredStyle: .actionSheet
         )
         
-        // Always allow viewing details
         alert.addAction(UIAlertAction(title: "View Details", style: .default) { [weak self] _ in
             self?.showMemoryDetail(memory: memory)
+        })
+        
+        // Add "Share with more groups" option
+        alert.addAction(UIAlertAction(title: "Share with more groups", style: .default) { [weak self] _ in
+            self?.showShareWithGroups(memory: memory)
         })
         
         // Only show delete option if user is the owner
@@ -179,6 +248,62 @@ class FamilyMemberViewController: UIViewController {
         }
         
         present(alert, animated: true)
+    }
+
+    private func showShareWithGroups(memory: GroupMemory) {
+        guard let memoryId = UUID(uuidString: memory.id) else { return }
+        
+        Task {
+            do {
+                // Get user's groups and groups already shared with
+                let userGroups = try await SupabaseManager.shared.getMyGroups()
+                let alreadySharedGroups = try await SupabaseManager.shared.getGroupsForMemory(memoryId: memoryId)
+                
+                DispatchQueue.main.async {
+                    let vc = MultipleGroupsSelectionViewController()
+                    vc.userGroups = userGroups
+                    vc.selectedGroups = alreadySharedGroups
+                    vc.onSelectionComplete = { [weak self] selectedGroups in
+                        self?.shareMemoryWithAdditionalGroups(memoryId: memoryId, selectedGroups: selectedGroups)
+                    }
+                    let nav = UINavigationController(rootViewController: vc)
+                    self.present(nav, animated: true)
+                }
+            } catch {
+                print("Error fetching groups: \(error)")
+            }
+        }
+    }
+    
+    private func showSuccessMessage(_ message: String) {
+        let alert = UIAlertController(
+            title: "Success",
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+
+    private func shareMemoryWithAdditionalGroups(memoryId: UUID, selectedGroups: [UserGroup]) {
+        let groupIds = selectedGroups.compactMap { UUID(uuidString: $0.id) }
+        
+        Task {
+            do {
+                try await SupabaseManager.shared.shareMemoryWithGroups(
+                    memoryId: memoryId,
+                    groupIds: groupIds
+                )
+                
+                DispatchQueue.main.async {
+                    self.showSuccessMessage("Memory shared with selected groups")
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self.showError(message: "Failed to share memory: \(error.localizedDescription)")
+                }
+            }
+        }
     }
     
     private func confirmDeleteMemory(memory: GroupMemory, at indexPath: IndexPath) {
