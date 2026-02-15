@@ -7,6 +7,11 @@ class GroupMemoryViewController: UIViewController {
     private var memory: GroupMemory
     private var mediaItems: [SupabaseMemoryMedia] = []
     
+    // MARK: - Audio Properties
+    private var audioPlayer: AVAudioPlayer?
+    private var audioURL: URL?
+    private var isAudioPreparing = false
+    
     // MARK: - UI Components
     private let scrollView = UIScrollView()
     private let contentView = UIView()
@@ -62,8 +67,50 @@ class GroupMemoryViewController: UIViewController {
         return label
     }()
     
-    private var audioPlayer: AVAudioPlayer?
-    private let audioButton = UIButton(type: .system)
+    // MARK: - Audio UI Components
+    private let audioContainerView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .secondarySystemBackground
+        view.layer.cornerRadius = 12
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
+    private let audioPlayButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setImage(UIImage(systemName: "play.circle.fill"), for: .normal)
+        button.tintColor = .systemBlue
+        button.translatesAutoresizingMaskIntoConstraints = false
+        return button
+    }()
+    
+    private let audioSlider: UISlider = {
+        let slider = UISlider()
+        slider.minimumValue = 0
+        slider.maximumValue = 1
+        slider.value = 0
+        slider.translatesAutoresizingMaskIntoConstraints = false
+        return slider
+    }()
+    
+    private let audioTimeLabel: UILabel = {
+        let label = UILabel()
+        label.font = UIFont.monospacedDigitSystemFont(ofSize: 12, weight: .regular)
+        label.textColor = .secondaryLabel
+        label.text = "00:00 / 00:00"
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private let audioLoadingIndicator: UIActivityIndicatorView = {
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.hidesWhenStopped = true
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        return indicator
+    }()
+    
+    private var audioTimer: Timer?
+    private var wasPlayingBeforeScrub = false
     
     // MARK: - Initializer
     init(memory: GroupMemory, mediaItems: [SupabaseMemoryMedia] = []) {
@@ -82,6 +129,21 @@ class GroupMemoryViewController: UIViewController {
         setupUI()
         configureWithMemory()
         loadImages()
+        setupAudio()
+        
+        // Configure audio session for playback
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("Failed to set audio session: \(error)")
+        }
+    }
+    
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        audioTimer?.invalidate()
+        audioPlayer?.stop()
     }
     
     // MARK: - Setup
@@ -105,17 +167,20 @@ class GroupMemoryViewController: UIViewController {
         imageStackView.spacing = 0
         imageScrollView.addSubview(imageStackView)
         
-        // Audio button setup
-        audioButton.translatesAutoresizingMaskIntoConstraints = false
-        audioButton.setTitle("Play Audio", for: .normal)
-        audioButton.setImage(UIImage(systemName: "play.circle.fill"), for: .normal)
-        audioButton.tintColor = .systemBlue
-        audioButton.addTarget(self, action: #selector(toggleAudio), for: .touchUpInside)
-        audioButton.isHidden = true
+        // Setup audio container
+        audioContainerView.addSubview(audioPlayButton)
+        audioContainerView.addSubview(audioSlider)
+        audioContainerView.addSubview(audioTimeLabel)
+        audioContainerView.addSubview(audioLoadingIndicator)
+        
+        audioPlayButton.addTarget(self, action: #selector(toggleAudio), for: .touchUpInside)
+        audioSlider.addTarget(self, action: #selector(sliderChanged), for: .valueChanged)
+        audioSlider.addTarget(self, action: #selector(sliderTouchDown), for: .touchDown)
+        audioSlider.addTarget(self, action: #selector(sliderTouchUp), for: [.touchUpInside, .touchUpOutside])
         
         // Add all views to content view
         [titleLabel, yearLabel, userLabel, dateLabel,
-         imageScrollView, textContentLabel, audioButton].forEach {
+         imageScrollView, textContentLabel, audioContainerView].forEach {
             contentView.addSubview($0)
         }
         
@@ -175,14 +240,34 @@ class GroupMemoryViewController: UIViewController {
             textContentLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             textContentLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             
+            // Audio container
+            audioContainerView.topAnchor.constraint(equalTo: textContentLabel.bottomAnchor, constant: 20),
+            audioContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            audioContainerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            audioContainerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -30),
+            audioContainerView.heightAnchor.constraint(equalToConstant: 80),
+            
             // Audio button
-            audioButton.topAnchor.constraint(equalTo: textContentLabel.bottomAnchor, constant: 20),
-            audioButton.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            audioButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -30)
+            audioPlayButton.leadingAnchor.constraint(equalTo: audioContainerView.leadingAnchor, constant: 16),
+            audioPlayButton.centerYAnchor.constraint(equalTo: audioContainerView.centerYAnchor),
+            audioPlayButton.widthAnchor.constraint(equalToConstant: 44),
+            audioPlayButton.heightAnchor.constraint(equalToConstant: 44),
+            
+            // Audio slider
+            audioSlider.leadingAnchor.constraint(equalTo: audioPlayButton.trailingAnchor, constant: 12),
+            audioSlider.trailingAnchor.constraint(equalTo: audioTimeLabel.leadingAnchor, constant: -12),
+            audioSlider.centerYAnchor.constraint(equalTo: audioContainerView.centerYAnchor),
+            
+            // Audio time label
+            audioTimeLabel.trailingAnchor.constraint(equalTo: audioContainerView.trailingAnchor, constant: -16),
+            audioTimeLabel.centerYAnchor.constraint(equalTo: audioContainerView.centerYAnchor),
+            
+            // Loading indicator
+            audioLoadingIndicator.centerXAnchor.constraint(equalTo: audioContainerView.centerXAnchor),
+            audioLoadingIndicator.centerYAnchor.constraint(equalTo: audioContainerView.centerYAnchor)
         ])
     }
     
-    // MARK: - Configuration
     // MARK: - Configuration
     private func configureWithMemory() {
         titleLabel.text = memory.title
@@ -200,18 +285,15 @@ class GroupMemoryViewController: UIViewController {
         dateFormatter.timeStyle = .short
         dateLabel.text = "Created: \(dateFormatter.string(from: memory.createdAt))"
         
-        // FIX: Extract text content from mediaItems
-        var textContent = memory.content // Use existing content if available
+        // Extract text content from mediaItems
+        var textContent = memory.content
         
-        // If no content in memory object, check mediaItems for text content
         if (textContent?.isEmpty ?? true) {
-            // Find first text media item
             if let textMedia = mediaItems.first(where: { $0.mediaType == "text" }) {
                 textContent = textMedia.textContent
             }
         }
         
-        // Set text content
         textContentLabel.text = textContent
         textContentLabel.isHidden = (textContent?.isEmpty ?? true)
     }
@@ -229,16 +311,10 @@ class GroupMemoryViewController: UIViewController {
         let imageMedia = mediaItems.filter { $0.mediaType == "photo" }
         
         if imageMedia.isEmpty {
-            // No images, hide image scroll view
             imageScrollView.isHidden = true
-            // Update text content position
-            NSLayoutConstraint.activate([
-                textContentLabel.topAnchor.constraint(equalTo: dateLabel.bottomAnchor, constant: 20)
-            ])
             return
         }
         
-        // Show image scroll view
         imageScrollView.isHidden = false
         
         // Create image views
@@ -260,18 +336,16 @@ class GroupMemoryViewController: UIViewController {
                 activityIndicator.centerYAnchor.constraint(equalTo: imageView.centerYAnchor)
             ])
             
-            // FIRST: Add the imageView to the stack view
+            // Add to stack view
             imageStackView.addArrangedSubview(imageView)
             imageViews.append(imageView)
             
-            // THEN: Set constraints AFTER adding to hierarchy
-            // Use a reference to self.view for width
             NSLayoutConstraint.activate([
                 imageView.widthAnchor.constraint(equalTo: view.widthAnchor),
                 imageView.heightAnchor.constraint(equalToConstant: 300)
             ])
             
-            // Load image asynchronously
+            // Load image
             loadImage(from: media.mediaUrl, for: imageView, activityIndicator: activityIndicator)
         }
         
@@ -279,37 +353,22 @@ class GroupMemoryViewController: UIViewController {
         if imageMedia.count > 1 {
             setupPageControl(totalPages: imageMedia.count)
         }
-        
-        // Check for audio
-        let audioMedia = mediaItems.first { $0.mediaType == "audio" }
-        if let audioUrl = audioMedia?.mediaUrl {
-            setupAudioPlayer(url: audioUrl)
-            audioButton.isHidden = false
-        } else {
-            audioButton.isHidden = true
-        }
     }
     
     private func loadImage(from urlString: String, for imageView: UIImageView, activityIndicator: UIActivityIndicatorView) {
         guard let url = URL(string: urlString) else {
-            print("Invalid image URL: \(urlString)")
             activityIndicator.stopAnimating()
             imageView.image = UIImage(systemName: "photo")
-            imageView.tintColor = .systemGray
             return
         }
         
-        // Use URLSession for better async loading
-        let task = URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
-            guard let self = self else { return }
-            
+        let task = URLSession.shared.dataTask(with: url) { data, response, error in
             DispatchQueue.main.async {
                 activityIndicator.stopAnimating()
                 
                 if let error = error {
                     print("Failed to load image: \(error)")
                     imageView.image = UIImage(systemName: "photo")
-                    imageView.tintColor = .systemGray
                     return
                 }
                 
@@ -317,7 +376,6 @@ class GroupMemoryViewController: UIViewController {
                     imageView.image = image
                 } else {
                     imageView.image = UIImage(systemName: "photo")
-                    imageView.tintColor = .systemGray
                 }
             }
         }
@@ -343,40 +401,151 @@ class GroupMemoryViewController: UIViewController {
         imageScrollView.delegate = self
     }
     
-    private func setupAudioPlayer(url: String) {
-        guard let audioURL = URL(string: url) else {
-            print("Invalid audio URL: \(url)")
+    // MARK: - Audio Setup
+    private func setupAudio() {
+        // Find audio media
+        guard let audioMedia = mediaItems.first(where: { $0.mediaType == "audio" }),
+              let audioURLString = audioMedia.mediaUrl as String?,
+              let url = URL(string: audioURLString) else {
+            audioContainerView.isHidden = true
             return
         }
         
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            do {
-                let audioData = try Data(contentsOf: audioURL)
-                let player = try AVAudioPlayer(data: audioData)
-                player.prepareToPlay()
-                
+        audioContainerView.isHidden = false
+        audioLoadingIndicator.startAnimating()
+        audioPlayButton.isEnabled = false
+        
+        // Download audio file first (important for m4a files)
+        downloadAudio(from: url)
+    }
+    
+    private func downloadAudio(from url: URL) {
+        let task = URLSession.shared.downloadTask(with: url) { [weak self] localURL, response, error in
+            guard let self = self, let localURL = localURL, error == nil else {
                 DispatchQueue.main.async {
-                    self?.audioPlayer = player
-                    self?.audioButton.isHidden = false
+                    self?.audioLoadingIndicator.stopAnimating()
+                    self?.audioContainerView.isHidden = true
+                    print("Failed to download audio: \(error?.localizedDescription ?? "unknown error")")
                 }
-            } catch {
-                print("Failed to setup audio player: \(error)")
+                return
             }
+            
+            do {
+                // Move to a permanent location in documents directory
+                let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                let destinationURL = documentsURL.appendingPathComponent(localURL.lastPathComponent)
+                
+                // Remove existing file if needed
+                try? FileManager.default.removeItem(at: destinationURL)
+                try FileManager.default.moveItem(at: localURL, to: destinationURL)
+                
+                // Setup audio player with the local file
+                try self.setupAudioPlayer(with: destinationURL)
+                
+            } catch {
+                print("Failed to setup audio: \(error)")
+                
+                // Fallback: Try streaming with AVPlayer
+                DispatchQueue.main.async {
+                    self.setupStreamingPlayer(with: url)
+                }
+            }
+        }
+        task.resume()
+    }
+    
+    private func setupAudioPlayer(with url: URL) throws {
+        // For m4a files, we need to use AVAudioPlayer with the correct file type
+        audioPlayer = try AVAudioPlayer(contentsOf: url)
+        audioPlayer?.prepareToPlay()
+        audioPlayer?.delegate = self
+        
+        DispatchQueue.main.async {
+            self.audioLoadingIndicator.stopAnimating()
+            self.audioPlayButton.isEnabled = true
+            self.updateAudioTimeDisplay()
         }
     }
     
-    // MARK: - Actions
+    private func setupStreamingPlayer(with url: URL) {
+        // For streaming, use AVPlayer which handles more formats
+        let playerItem = AVPlayerItem(url: url)
+        let player = AVPlayer(playerItem: playerItem)
+        
+        // We need to adapt this to work with our AVAudioPlayer-based UI
+        // For simplicity, we'll use AVPlayer and update UI accordingly
+        // This requires more changes - let me know if you need streaming support
+        print("Streaming not implemented in this version")
+        audioContainerView.isHidden = true
+    }
+    
+    // MARK: - Audio Actions
     @objc private func toggleAudio() {
         guard let player = audioPlayer else { return }
         
         if player.isPlaying {
             player.pause()
-            audioButton.setImage(UIImage(systemName: "play.circle.fill"), for: .normal)
-            audioButton.setTitle("Play Audio", for: .normal)
+            audioPlayButton.setImage(UIImage(systemName: "play.circle.fill"), for: .normal)
+            stopAudioTimer()
         } else {
             player.play()
-            audioButton.setImage(UIImage(systemName: "pause.circle.fill"), for: .normal)
-            audioButton.setTitle("Pause Audio", for: .normal)
+            audioPlayButton.setImage(UIImage(systemName: "pause.circle.fill"), for: .normal)
+            startAudioTimer()
+        }
+    }
+    
+    private func startAudioTimer() {
+        stopAudioTimer()
+        audioTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            self?.updateAudioTimeDisplay()
+        }
+    }
+    
+    private func stopAudioTimer() {
+        audioTimer?.invalidate()
+        audioTimer = nil
+    }
+    
+    private func updateAudioTimeDisplay() {
+        guard let player = audioPlayer else { return }
+        
+        let current = player.currentTime
+        let duration = player.duration
+        
+        if duration > 0 {
+            audioSlider.value = Float(current / duration)
+            
+            let currentMinutes = Int(current) / 60
+            let currentSeconds = Int(current) % 60
+            let totalMinutes = Int(duration) / 60
+            let totalSeconds = Int(duration) % 60
+            
+            audioTimeLabel.text = String(format: "%02d:%02d / %02d:%02d",
+                                         currentMinutes, currentSeconds,
+                                         totalMinutes, totalSeconds)
+        }
+    }
+    
+    @objc private func sliderChanged(_ sender: UISlider) {
+        guard let player = audioPlayer, player.duration > 0 else { return }
+        player.currentTime = Double(sender.value) * player.duration
+        updateAudioTimeDisplay()
+    }
+    
+    @objc private func sliderTouchDown(_ sender: UISlider) {
+        wasPlayingBeforeScrub = audioPlayer?.isPlaying ?? false
+        if wasPlayingBeforeScrub {
+            audioPlayer?.pause()
+            stopAudioTimer()
+            audioPlayButton.setImage(UIImage(systemName: "play.circle.fill"), for: .normal)
+        }
+    }
+    
+    @objc private func sliderTouchUp(_ sender: UISlider) {
+        if wasPlayingBeforeScrub {
+            audioPlayer?.play()
+            startAudioTimer()
+            audioPlayButton.setImage(UIImage(systemName: "pause.circle.fill"), for: .normal)
         }
     }
 }
@@ -388,5 +557,20 @@ extension GroupMemoryViewController: UIScrollViewDelegate {
             let pageIndex = round(scrollView.contentOffset.x / scrollView.frame.width)
             pageControl.currentPage = Int(pageIndex)
         }
+    }
+}
+
+// MARK: - AVAudioPlayerDelegate
+extension GroupMemoryViewController: AVAudioPlayerDelegate {
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        audioPlayButton.setImage(UIImage(systemName: "play.circle.fill"), for: .normal)
+        audioSlider.value = 0
+        stopAudioTimer()
+        updateAudioTimeDisplay()
+    }
+    
+    func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        print("Audio decode error: \(error?.localizedDescription ?? "unknown")")
+        audioContainerView.isHidden = true
     }
 }
