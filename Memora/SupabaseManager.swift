@@ -1261,6 +1261,7 @@ class SupabaseManager {
                     )
                 """)
                 .eq("group_id", value: groupId)
+                .neq("memories.visibility", value: "scheduled")
                 .order("created_at", ascending: false)
                 .execute()
             
